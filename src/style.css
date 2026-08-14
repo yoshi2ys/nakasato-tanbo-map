@@ -131,3 +131,108 @@ body {
   background: #d2d2d7;
   cursor: default;
 }
+
+#library {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e5e7;
+}
+
+#library-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+#library-empty {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #86868b;
+}
+
+#paddies {
+  margin: 0;
+  padding: 0;
+  max-height: 168px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+#paddies li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#paddies button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 名前と面積を出す行そのものが選択ボタン。 */
+.paddy-select {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.paddy-select:hover {
+  background: #f0f0f2;
+}
+
+li.active .paddy-select {
+  background: #e8f4ff;
+  font-weight: 600;
+}
+
+.paddy-area {
+  color: #6e6e73;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.paddy-delete {
+  color: #86868b;
+}
+
+.paddy-delete:hover {
+  color: #c8102e;
+}
+
+#library-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#library-actions button {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#library-actions button:disabled {
+  color: #b0b0b5;
+  cursor: default;
+}
+
+/* 検出中や読み込み前は、一覧の選択・削除も受け付けない。 */
+#paddies.locked {
+  opacity: 0.5;
+  pointer-events: none;
+}

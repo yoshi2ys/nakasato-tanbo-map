@@ -22,6 +22,17 @@
         <dd id="area-se"></dd>
       </dl>
       <button id="reset" type="button" disabled>新しく描く</button>
+
+      <section id="library">
+        <h2 id="library-heading">保存した田んぼ</h2>
+        <ul id="paddies"></ul>
+        <p id="library-empty">まだありません。輪郭を閉じると保存されます。</p>
+        <div id="library-actions">
+          <button id="export" type="button" disabled>書き出す</button>
+          <button id="import" type="button" disabled>読み込む</button>
+          <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
+        </div>
+      </section>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

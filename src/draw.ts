@@ -12,7 +12,8 @@ const MIN_GHOST_EDGE_PIXELS = 32;
 const MIN_VERTICES = 3;
 
 const SOURCE_ID = 'tanbo-draw';
-const FILL_LAYER_ID = 'tanbo-draw-fill';
+/** 保存済みの田んぼは、この層より下に敷く。 */
+export const FILL_LAYER_ID = 'tanbo-draw-fill';
 const LINE_LAYER_ID = 'tanbo-draw-line';
 const VERTEX_LAYER_ID = 'tanbo-draw-vertex';
 
@@ -69,7 +70,7 @@ function segmentsCross(a1: Vertex, a2: Vertex, b1: Vertex, b2: Vertex): boolean 
  * 輪郭が自分自身と交差しているか。
  * turf の面積計算は交差したリングでも黙って値を返すので、こちらで見張る。
  */
-function isSelfIntersecting(vertices: Vertex[]): boolean {
+export function isSelfIntersecting(vertices: Vertex[]): boolean {
   const count = vertices.length;
   if (count < 4) return false;
 
@@ -170,6 +171,11 @@ export class PolygonDrawer {
     this.#cursor = null;
     this.#setCursor('');
     this.#render();
+  }
+
+  /** いま編集している頂点。保存するときに読む（毎フレームではないのでコピーで渡す）。 */
+  get vertices(): Vertex[] {
+    return this.#vertices.map((vertex) => [...vertex] satisfies Vertex);
   }
 
   /** 外から作った輪郭（自動検出の結果）を、そのまま編集できる状態で受け取る。 */
