@@ -19,8 +19,8 @@ const SEAMLESSPHOTO_MAX_ZOOM = 18;
 const SEAMLESSPHOTO_ATTRIBUTION =
   '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 全国最新写真（シームレス）</a>';
 
-/** 初期表示位置（新潟市南区の水田地帯）。 */
-const INITIAL_CENTER: [number, number] = [139.033, 37.78];
+/** 初期表示位置。GeoJSON と同じ順（経度, 緯度）で持つ。 */
+const INITIAL_CENTER: [number, number] = [138.70184, 37.0525];
 const INITIAL_ZOOM = 17;
 
 export function createMap(container: HTMLElement): MapLibreMap {
