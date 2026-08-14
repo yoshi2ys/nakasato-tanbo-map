@@ -112,7 +112,9 @@ window.addEventListener('pagehide', () => {
 
 const map = createMap(element('map'));
 
-map.on('load', () => {
+// タイルの読み込みではなくスタイルの用意ができた時点で始める。
+// 写真タイルが落ちてもアプリが起動しないという状態を作らないため。
+map.on('style.load', () => {
   const drawer = new PolygonDrawer(map, (state) => {
     const closed = state.mode === 'editing';
     const wasClosed = drawState.mode === 'editing';

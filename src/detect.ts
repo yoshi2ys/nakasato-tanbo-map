@@ -11,10 +11,22 @@ const COLOR_TOLERANCE = 18;
 /** フラッドフィルの連結性。斜めに繋がった 1px の隙間から漏れないよう 4 近傍にする。 */
 const CONNECTIVITY = 4;
 /**
- * ノイズを潰し、畦道の切れ目を埋めるモルフォロジーのカーネルサイズ（CSS ピクセル）。
- * canvas は Retina で 2 倍の解像度になるため、実際のカーネルは scale 倍して使う。
+ * 画像の細かさに関わる寸法は、ピクセルではなく地上距離で決める。
+ * 画像ソースやズームが変わると 1px の地上距離は数倍変わるため、ピクセル固定だと
+ * 「解像度を上げたら検出できなくなる」ことが起きる。
  */
-const KERNEL_CSS_PIXELS = 7;
+/**
+ * フラッドフィルの前にかける平滑化。稲の条間など、圃場内部の模様を消すための幅。
+ *
+ * 十日町市の航空写真（z20 まで）は条間まで写るので、ならさないと塗りが 1 枚を渡りきれない。
+ * 一方これを大きくすると、粗い地理院タイルでは畦の輪郭まで消えて隣へ漏れやすくなる。
+ * 既定の表示地点で実測して 2m とした（市の写真で 6/7、地理院タイルでも 5/5 検出）。
+ */
+const BLUR_METERS = 2;
+/** ノイズを潰し、畦道の切れ目を埋めるモルフォロジーの幅。畦 1 本ぶんを見込む。 */
+const MORPH_METERS = 3.3;
+/** カーネルが大きくなりすぎると medianBlur が重いので上限を設ける。 */
+const MAX_KERNEL_PIXELS = 15;
 /** 間引き後に許す頂点数の上限。これを超えるあいだ epsilon を上げる。 */
 const MAX_VERTICES = 15;
 /** approxPolyDP の epsilon（周長に対する比）の探索範囲。 */
@@ -72,6 +84,8 @@ interface Capture {
   imageData: ImageData;
   /** CSS ピクセルに対する canvas の解像度倍率（Retina なら 2）。 */
   scale: number;
+  /** 撮影した画像の 1 ピクセルが地上で何メートルか。 */
+  metersPerPixel: number;
   /**
    * 撮影時のカメラと表示サイズ。緯度経度へ戻すときに、これらが変わっていないことを確かめる。
    * ウィンドウのリサイズは center も zoom も変えないまま unproject の結果を変えるので、
@@ -102,9 +116,14 @@ function captureMap(map: MapLibreMap): Capture {
   if (context === null) throw new DetectionError('canvas を用意できませんでした');
 
   context.drawImage(source, 0, 0);
+  const scale = source.width / source.clientWidth;
+  // MapLibre のズームは 512px タイル基準なので、CSS ピクセルの分解能は 2^(zoom+1) で割る。
+  const metersPerCssPixel =
+    (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 1);
   return {
     imageData: context.getImageData(0, 0, canvas.width, canvas.height),
-    scale: source.width / source.clientWidth,
+    scale,
+    metersPerPixel: metersPerCssPixel / scale,
     camera: cameraKey(map),
   };
 }
@@ -118,6 +137,12 @@ export async function waitForIdle(map: MapLibreMap): Promise<void> {
     map.once('idle'),
     new Promise((resolve) => setTimeout(resolve, IDLE_TIMEOUT_MS)),
   ]);
+}
+
+/** 地上距離をピクセル数に直す。OpenCV のカーネルは奇数でなければならない。 */
+function toOddPixels(meters: number, metersPerPixel: number): number {
+  const pixels = Math.round(meters / metersPerPixel) | 1;
+  return Math.min(Math.max(pixels, 3), MAX_KERNEL_PIXELS);
 }
 
 /** 周長に対する epsilon を上げながら、頂点数が収まるまで間引く。 */
@@ -200,14 +225,16 @@ export async function detectOutline(
     filled = new cv.Mat();
     // マスクは上下左右に 1px の番兵を持つ必要があるので、画像より 2 だけ大きく取る。
     mask = cv.Mat.zeros(imageData.height + 2, imageData.width + 2, cv.CV_8UC1);
-    // カーネルは CSS ピクセル基準で決める。Retina では canvas が 2 倍の解像度になるため、
-    // 固定値のままだと畦道の切れ目に対して実質半分の大きさになってしまう。
-    const kernelPixels = Math.max(3, Math.round(KERNEL_CSS_PIXELS * scale) | 1);
+    const kernelPixels = toOddPixels(MORPH_METERS, capture.metersPerPixel);
     kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, new cv.Size(kernelPixels, kernelPixels));
     contours = new cv.MatVector();
     hierarchy = new cv.Mat();
 
     cv.cvtColor(source, rgb, cv.COLOR_RGBA2RGB);
+
+    // 解像度が上がるほど圃場内部の模様（稲の条間、刈り跡）が写る。そのままだと
+    // フラッドフィルが 1 枚の田んぼを渡りきれないので、地上 1m 相当でならしてから塗る。
+    cv.medianBlur(rgb, rgb, toOddPixels(BLUR_METERS, capture.metersPerPixel));
 
     // FLOODFILL_MASK_ONLY で元画像には触れず、マスクにだけ 255 を書く。
     // FIXED_RANGE は隣接画素ではなくシードの色と比べるので、田んぼ全体の色ムラに強い。
