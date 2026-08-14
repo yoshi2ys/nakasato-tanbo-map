@@ -16,7 +16,7 @@ const FILL_LAYER_ID = 'tanbo-draw-fill';
 const LINE_LAYER_ID = 'tanbo-draw-line';
 const VERTEX_LAYER_ID = 'tanbo-draw-vertex';
 
-type Vertex = [lng: number, lat: number];
+export type Vertex = [lng: number, lat: number];
 
 /** `drawing` は頂点を足していく段階、`editing` は閉合後の調整段階。 */
 export type DrawMode = 'drawing' | 'editing';
@@ -109,6 +109,7 @@ export class PolygonDrawer {
   /** 頂点が変わったときだけ計算する面積。カーソル移動では変わらない。 */
   #areaSquareMeters: number | null = null;
   #selfIntersecting = false;
+  #enabled = true;
   /** 予約済みの再描画フレーム。mousemove ごとの再構築を 1 フレームにまとめる。 */
   #pendingFrame: number | null = null;
 
@@ -117,18 +118,71 @@ export class PolygonDrawer {
     this.#onChange = onChange;
     this.#source = this.#addLayers();
 
-    map.on('click', this.#handleClick);
-    map.on('mousemove', this.#handleMouseMove);
-    map.on('mouseout', this.#handleMouseOut);
-    map.on('mousedown', this.#handleMouseDown);
-    map.on('contextmenu', this.#handleContextMenu);
+    this.#addInputListeners();
     // ゴーストを出す辺はスクリーン上の長さで決まるので、ズームが変わったら引き直す。
     map.on('zoomend', this.#handleZoomEnd);
-    window.addEventListener('keydown', this.#handleKeyDown);
 
     // 閉合のダブルクリックでズームさせない。
     map.doubleClickZoom.disable();
     this.#render();
+  }
+
+  #addInputListeners(): void {
+    this.#map.on('click', this.#handleClick);
+    this.#map.on('mousemove', this.#handleMouseMove);
+    this.#map.on('mouseout', this.#handleMouseOut);
+    this.#map.on('mousedown', this.#handleMouseDown);
+    this.#map.on('contextmenu', this.#handleContextMenu);
+    window.addEventListener('keydown', this.#handleKeyDown);
+  }
+
+  #removeInputListeners(): void {
+    this.#map.off('click', this.#handleClick);
+    this.#map.off('mousemove', this.#handleMouseMove);
+    this.#map.off('mouseout', this.#handleMouseOut);
+    this.#map.off('mousedown', this.#handleMouseDown);
+    this.#map.off('contextmenu', this.#handleContextMenu);
+    window.removeEventListener('keydown', this.#handleKeyDown);
+  }
+
+  /** 自動検出が写真だけを読めるよう、描いたものを一時的に隠す。 */
+  setLayersVisible(visible: boolean): void {
+    const visibility = visible ? 'visible' : 'none';
+    for (const id of [FILL_LAYER_ID, LINE_LAYER_ID, VERTEX_LAYER_ID]) {
+      this.#map.setLayoutProperty(id, 'visibility', visibility);
+    }
+  }
+
+  /**
+   * 入力を受け付けるかどうか。自動検出モードのあいだは、クリックを検出側に譲る。
+   * 描いたものはそのまま残す。
+   */
+  setEnabled(enabled: boolean): void {
+    if (this.#enabled === enabled) return;
+    this.#enabled = enabled;
+
+    if (enabled) {
+      this.#addInputListeners();
+      return;
+    }
+    this.#removeInputListeners();
+    this.#endDrag();
+    this.#cursor = null;
+    this.#setCursor('');
+    this.#render();
+  }
+
+  /** 外から作った輪郭（自動検出の結果）を、そのまま編集できる状態で受け取る。 */
+  load(vertices: Vertex[]): void {
+    if (vertices.length < MIN_VERTICES) {
+      throw new Error(`頂点が ${MIN_VERTICES} 個に足りません`);
+    }
+    this.#mode = 'editing';
+    this.#vertices = vertices.map((vertex) => [...vertex] satisfies Vertex);
+    this.#cursor = null;
+    this.#selected = null;
+    this.#endDrag();
+    this.#commitVertices();
   }
 
   /** 描いたものを捨てて、新しいポリゴンの入力を始める。 */

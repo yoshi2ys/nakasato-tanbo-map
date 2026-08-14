@@ -33,6 +33,8 @@ export function createMap(container: HTMLElement): MapLibreMap {
     // 頂点編集で誤操作しないよう、回転・傾斜は無効にしておく。
     dragRotate: false,
     pitchWithRotate: false,
+    // 自動検出が描画結果を canvas から読み出すので、バッファを破棄させない。
+    canvasContextAttributes: { preserveDrawingBuffer: true },
     attributionControl: false,
     style: {
       version: 8,

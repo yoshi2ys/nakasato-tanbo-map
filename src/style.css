@@ -25,6 +25,50 @@ body {
   box-shadow: 0 2px 12px rgb(0 0 0 / 0.18);
 }
 
+#mode {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 12px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f0f0f2;
+}
+
+#mode label {
+  flex: 1;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
+}
+
+#mode label:has(:checked) {
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+/* radio 本体は隠しているので、フォーカスはラベル側に出す。 */
+#mode label:has(:focus-visible) {
+  outline: 2px solid #0071e3;
+  outline-offset: 1px;
+}
+
+#mode:has(:disabled) {
+  opacity: 0.5;
+}
+
+#mode:has(:disabled) label {
+  cursor: default;
+}
+
+#mode input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
 #hint {
   margin: 0;
   font-size: 12px;
@@ -50,7 +94,7 @@ body {
   opacity: 0.4;
 }
 
-#panel:has(#area.unreliable) #hint {
+#hint.warning {
   color: #c8102e;
 }
 

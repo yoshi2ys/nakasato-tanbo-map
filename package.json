@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@techstark/opencv-js": "^5.0.0-release.1",
     "@turf/area": "^7.4.0",
     "maplibre-gl": "^6.3.0"
   },
