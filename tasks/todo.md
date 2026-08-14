@@ -14,7 +14,7 @@
 
 ## Plan
 
-- [ ] **Step 1 — 地図表示**: Vite + vanilla TS で MapLibre に国土地理院写真タイルを表示、出典クレジット付与。
+- [x] **Step 1 — 地図表示**: Vite + vanilla TS で MapLibre に国土地理院写真タイルを表示、出典クレジット付与。
       → verify: `npm run dev` でブラウザに航空写真が表示される。
 - [ ] **Step 2 — 手動ポリゴン描画**: クリックで頂点追加（GeoJSON ソース + レイヤー）。開始点から 12px 以内のクリックでスナップ閉合（`map.project()` でスクリーン座標比較）。ダブルクリック / Enter でも閉合。閉合時に `turf.area()` で面積を㎡・反・畝表示。
       → verify: 実際に輪郭を描いて閉じ、面積が妥当な値になる。
@@ -32,4 +32,9 @@
 
 ## Review
 
-（未着手）
+### Step 1 — 地図表示（完了）
+
+- 構成: `index.html` / `src/main.ts`（起動）/ `src/map.ts`（地図生成）/ `src/style.css`。Vite + vanilla TS、依存は maplibre-gl のみ。
+- `src/map.ts` で国土地理院シームレス写真を raster source（`maxzoom: 18`、地図側 `maxZoom: 21` でオーバーズーム）として読み込み、出典を `attribution` に設定。頂点編集の誤操作を避けるため回転・傾斜は無効化。
+- 初期表示は新潟市南区の水田地帯 `[139.033, 37.78]` / zoom 17。
+- 検証: `npx tsc --noEmit` 通過。`npm run dev` + Playwright（headless Chromium）で読み込み → console エラー 0、タイル 30 件すべて 200、出典表記「国土地理院 全国最新写真（シームレス）」を確認。スクリーンショットで水田の航空写真を目視確認。
