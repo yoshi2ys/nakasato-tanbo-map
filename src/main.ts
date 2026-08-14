@@ -16,8 +16,15 @@ const areaTanValue = element('area-tan');
 const areaSeValue = element('area-se');
 const resetButton = element<HTMLButtonElement>('reset');
 
-function render({ areaSquareMeters, closed, vertexCount }: DrawState): void {
+function render({
+  areaSquareMeters,
+  canDeleteVertex,
+  mode,
+  selfIntersecting,
+  vertexCount,
+}: DrawState): void {
   areaList.hidden = areaSquareMeters === null;
+  areaList.classList.toggle('unreliable', selfIntersecting);
   if (areaSquareMeters !== null) {
     const formatted = formatArea(areaSquareMeters);
     areaSquareMetersValue.textContent = formatted.squareMeters;
@@ -25,8 +32,12 @@ function render({ areaSquareMeters, closed, vertexCount }: DrawState): void {
     areaSeValue.textContent = formatted.se;
   }
 
-  if (closed) {
-    hint.textContent = '輪郭を閉じました';
+  if (selfIntersecting) {
+    hint.textContent = '輪郭が交差しています。この面積は当てになりません';
+  } else if (mode === 'editing') {
+    hint.textContent = canDeleteVertex
+      ? '頂点をドラッグで移動、中点をクリックで追加。削除は右クリック、または選択して Delete'
+      : '頂点をドラッグで移動、中点をクリックで追加（これ以上は減らせません）';
   } else if (vertexCount >= 3) {
     hint.textContent = '開始点をクリック / ダブルクリック / Enter で閉じる';
   } else if (vertexCount >= 1) {

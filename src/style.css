@@ -17,6 +17,7 @@ body {
   left: 12px;
   z-index: 1;
   min-width: 168px;
+  max-width: 260px;
   padding: 14px 16px;
   border-radius: 12px;
   background: rgb(255 255 255 / 0.92);
@@ -42,6 +43,15 @@ body {
 /* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
 #area[hidden] {
   display: none;
+}
+
+/* 輪郭が交差していると面積は当てにならないので、数値を前に出さない。 */
+#area.unreliable {
+  opacity: 0.4;
+}
+
+#panel:has(#area.unreliable) #hint {
+  color: #c8102e;
 }
 
 #area dt {
