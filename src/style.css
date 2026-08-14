@@ -2,9 +2,78 @@ html,
 body {
   margin: 0;
   height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  color: #1d1d1f;
 }
 
 #map {
   position: absolute;
   inset: 0;
+}
+
+#panel {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 1;
+  min-width: 168px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.18);
+}
+
+#hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6e6e73;
+}
+
+#area {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 12px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
+#area[hidden] {
+  display: none;
+}
+
+#area dt {
+  font-size: 12px;
+  color: #6e6e73;
+}
+
+#area dd {
+  margin: 0;
+  font-size: 15px;
+  text-align: right;
+}
+
+#area dd:first-of-type {
+  font-size: 19px;
+  font-weight: 600;
+}
+
+#reset {
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #0071e3;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+#reset:disabled {
+  background: #d2d2d7;
+  cursor: default;
 }

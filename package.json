@@ -10,9 +10,11 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@turf/area": "^7.4.0",
     "maplibre-gl": "^6.3.0"
   },
   "devDependencies": {
+    "@types/geojson": "^7946.0.16",
     "typescript": "^7.0.2",
     "vite": "^8.2.1"
   }

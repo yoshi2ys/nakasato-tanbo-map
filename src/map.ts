@@ -3,8 +3,14 @@ import {
   Map as MapLibreMap,
   NavigationControl,
   ScaleControl,
+  setWorkerUrl,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+
+// maplibre-gl は worker を「自分自身の import.meta.url の兄弟ファイル」として実行時に
+// 解決するため、バンドラは worker を出力できない。Vite に出力させた URL を明示的に渡す。
+setWorkerUrl(workerUrl);
 
 /** 国土地理院「全国最新写真（シームレス）」タイル。API キー不要、出典表記が必須。 */
 const SEAMLESSPHOTO_TILE_URL =
