@@ -11,6 +11,7 @@
       <div id="mode" role="radiogroup" aria-label="入力方法">
         <label><input type="radio" name="mode" value="manual" checked disabled />手動</label>
         <label><input type="radio" name="mode" value="auto" disabled />自動検出</label>
+        <label><input type="radio" name="mode" value="measure" disabled />メジャー</label>
       </div>
       <p id="hint">読み込み中…</p>
       <dl id="area" hidden>
@@ -20,6 +21,10 @@
         <dd id="area-tan"></dd>
         <dt>畝</dt>
         <dd id="area-se"></dd>
+      </dl>
+      <dl id="measure" hidden>
+        <dt>合計</dt>
+        <dd id="measure-total"></dd>
       </dl>
       <button id="reset" type="button" disabled>新しく描く</button>
 

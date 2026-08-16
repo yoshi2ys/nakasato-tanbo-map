@@ -76,6 +76,43 @@ body {
   color: #6e6e73;
 }
 
+#measure {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 12px;
+  margin: 12px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
+#measure[hidden] {
+  display: none;
+}
+
+#measure dt {
+  font-size: 12px;
+  color: #6e6e73;
+}
+
+#measure dd {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* 辺の長さは MapLibre の Marker として置く。写真の上でも読めるよう地色を敷く。 */
+.measure-label {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgb(29 29 31 / 0.78);
+  color: #fff;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 #area {
   display: grid;
   grid-template-columns: auto 1fr;

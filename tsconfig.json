@@ -9,7 +9,10 @@
     "noUnusedParameters": true,
     "noEmit": true,
     "isolatedModules": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    // ブラウザで動くコードなので、Node の型を紛れ込ませない。
+    // 入れると process などが型検査を通ってしまい、実行時に ReferenceError になる。
+    "types": []
   },
   "include": ["src"]
 }

@@ -49,7 +49,7 @@ function toRing(vertices: Vertex[]): Vertex[] {
 }
 
 /** 田んぼ 1 枚のスケールでは、中点は緯度経度の単純平均で十分。 */
-function midpoint(a: Vertex, b: Vertex): Vertex {
+export function midpoint(a: Vertex, b: Vertex): Vertex {
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 }
 

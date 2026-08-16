@@ -16,6 +16,14 @@ function format(value: number, digits: number): string {
   });
 }
 
+/** 1km を超えたら km に切り替える。畦の長さは m、圃場をまたぐ距離は km が読みやすい。 */
+export function formatDistance(meters: number): string {
+  // 丸めてから単位を決める。先に比べると 999.6m が「1,000 m」になって単位を読み違える。
+  const rounded = meters < 100 ? Math.round(meters * 10) / 10 : Math.round(meters);
+  if (rounded >= 1000) return `${format(meters / 1000, 2)} km`;
+  return `${format(rounded, rounded < 100 ? 1 : 0)} m`;
+}
+
 export function formatArea(squareMeters: number): FormattedArea {
   return {
     // 100 ㎡ を超えたら小数は情報にならないので整数で示す。

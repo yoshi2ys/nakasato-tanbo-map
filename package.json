@@ -5,17 +5,22 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run type-check && vite build",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "test": "playwright test",
+    "test:dist": "TANBO_TEST_DIST=1 playwright test"
   },
   "dependencies": {
     "@techstark/opencv-js": "^5.0.0-release.1",
     "@turf/area": "^7.4.0",
+    "@turf/distance": "^7.4.0",
     "maplibre-gl": "^6.3.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/geojson": "^7946.0.16",
+    "@types/node": "^26.2.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.1"
   }

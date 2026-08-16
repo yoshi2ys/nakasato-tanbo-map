@@ -9,6 +9,7 @@ import {
   waitForIdle,
 } from './detect';
 import { createMap } from './map';
+import { MeasureTool, type MeasureState } from './measure';
 import {
   ImportError,
   fromGeoJSON,
@@ -22,7 +23,7 @@ import {
   type Paddy,
 } from './paddies';
 import { SavedPaddyLayer } from './paddyLayer';
-import { formatArea } from './units';
+import { formatArea, formatDistance } from './units';
 
 function element<T extends HTMLElement>(id: string): T {
   const found = document.getElementById(id);
@@ -42,6 +43,8 @@ const libraryEmpty = element('library-empty');
 const exportButton = element<HTMLButtonElement>('export');
 const importButton = element<HTMLButtonElement>('import');
 const importFile = element<HTMLInputElement>('import-file');
+const measureList = element('measure');
+const measureTotal = element('measure-total');
 
 /** 自動検出の進行状況。ヒント欄を占有するので、描画の状態より優先して出す。 */
 type Detection = { status: 'idle' } | { status: 'running' } | { status: 'failed'; message: string };
@@ -56,7 +59,11 @@ let drawState: DrawState = {
 let detection: Detection = { status: 'idle' };
 /** 取り込みや保存の結果。検出の進行とは別の話なので、状態を分けて持つ。 */
 let notice: string | null = null;
-let autoMode = false;
+
+/** パネルで選ぶ入力方法。地図のクリックを誰が受け取るかを決める。 */
+type Mode = 'manual' | 'auto' | 'measure';
+let mode: Mode = 'manual';
+let measureState: MeasureState = { pointCount: 0, totalMeters: null, finished: false };
 /** 地図のスタイルが揃うまでは、パネルの操作を受け付けない。 */
 let ready = false;
 /** 検出ごとの通し番号。割り込まれた古い検出の結果を捨てるために使う。 */
@@ -65,7 +72,8 @@ let detectionToken = 0;
 let paddies: Paddy[] = [];
 /** いま編集している田んぼ。まだ閉合していないあいだは null。 */
 let activeId: string | null = null;
-let storeTimer: number | undefined;
+// setTimeout の戻り値は環境で型が違うので、環境に合わせて受ける。
+let storeTimer: ReturnType<typeof setTimeout> | undefined;
 /** 一覧の再構築はドラッグ中に毎フレームやる必要がない。 */
 let listDirty = true;
 /** 編集中の田んぼの面積を出しているセル。ドラッグ中はここだけ書き換える。 */
@@ -76,9 +84,17 @@ function hintText(): string {
   if (detection.status === 'running') return '検出中…';
   if (detection.status === 'failed') return detection.message;
   if (notice !== null) return notice;
-  if (drawState.selfIntersecting) return '輪郭が交差しています。この面積は当てになりません';
 
-  if (autoMode) return '田んぼの中をクリックすると輪郭を推定します';
+  // 交差の警告は田んぼの輪郭の話。メジャー中に出しても意味がないので、モードを先に見る。
+  if (mode === 'measure') {
+    if (measureState.finished) return 'クリックすると新しく測り直します（Esc で消去）';
+    if (measureState.pointCount === 0) return 'クリックした点から点までの距離を測ります';
+    // 1 点だけでは Enter もダブルクリックも効かない。効かない操作を案内しない。
+    if (measureState.pointCount === 1) return 'もう 1 点クリックすると距離が出ます（Esc で消去）';
+    return 'クリックで点を継ぎ足し、ダブルクリック / Enter で終了（Esc で消去）';
+  }
+  if (drawState.selfIntersecting) return '輪郭が交差しています。この面積は当てになりません';
+  if (mode === 'auto') return '田んぼの中をクリックすると輪郭を推定します';
   if (drawState.mode === 'editing') {
     return drawState.canDeleteVertex
       ? '頂点をドラッグで移動、中点をクリックで追加。削除は右クリック、または選択して Delete'
@@ -126,6 +142,11 @@ map.on('style.load', () => {
     render();
   });
   const savedLayer = new SavedPaddyLayer(map, FILL_LAYER_ID);
+  // 計測の線は常に一番上に置きたいので、描画用のレイヤーより後に足す。
+  const measure = new MeasureTool(map, (state) => {
+    measureState = state;
+    render();
+  });
 
   /** 編集中の輪郭を、保存済みの 1 枚として反映する。閉合しているあいだだけ呼ぶ。 */
   function syncActivePaddy(): void {
@@ -161,7 +182,7 @@ map.on('style.load', () => {
     activeId = id;
     detection = { status: 'idle' };
     notice = null;
-    setAutoMode(false);
+    setMode('manual');
     drawer.load(paddy.vertices);
     refreshSavedLayer();
 
@@ -242,8 +263,14 @@ map.on('style.load', () => {
     const { areaSquareMeters, selfIntersecting, vertexCount } = drawState;
     const busy = detection.status === 'running';
 
-    areaList.hidden = areaSquareMeters === null;
+    // メジャー中は距離を主役にする。面積は田んぼの話なので引っ込める。
+    areaList.hidden = areaSquareMeters === null || mode === 'measure';
     areaList.classList.toggle('unreliable', selfIntersecting);
+    measureList.hidden = mode !== 'measure' || measureState.totalMeters === null;
+    // 隠すときに中身も消す。残しておくと、消えたはずの値を読めてしまう。
+    measureTotal.textContent = measureList.hidden
+      ? ''
+      : formatDistance(measureState.totalMeters ?? 0);
     if (areaSquareMeters !== null) {
       const formatted = formatArea(areaSquareMeters);
       areaSquareMetersValue.textContent = formatted.squareMeters;
@@ -254,9 +281,16 @@ map.on('style.load', () => {
     hint.textContent = hintText();
     hint.classList.toggle(
       'warning',
-      selfIntersecting || detection.status === 'failed' || notice !== null
+      (selfIntersecting && mode !== 'measure') || detection.status === 'failed' || notice !== null
     );
-    resetButton.disabled = !ready || busy || vertexCount === 0;
+    // ボタンはモードに合わせて役割を変える。メジャー中に「新しく描く」は意味を成さない。
+    if (mode === 'measure') {
+      resetButton.textContent = '計測を消す';
+      resetButton.disabled = !ready || measureState.pointCount === 0;
+    } else {
+      resetButton.textContent = '新しく描く';
+      resetButton.disabled = !ready || busy || vertexCount === 0;
+    }
     // 検出中にモードを変えられると、隠したままのレイヤーの上に手動で描けてしまう。
     for (const input of modeInputs) input.disabled = !ready || busy;
     importButton.disabled = !ready || busy;
@@ -272,14 +306,23 @@ map.on('style.load', () => {
     }
   }
 
-  function setAutoMode(enabled: boolean): void {
-    autoMode = enabled;
-    for (const input of modeInputs) input.checked = (input.value === 'auto') === enabled;
-    drawer.setEnabled(!enabled);
-    map.getCanvas().style.cursor = enabled ? 'crosshair' : '';
+  function setMode(next: Mode): void {
+    mode = next;
+    for (const input of modeInputs) input.checked = input.value === next;
+    drawer.setEnabled(next === 'manual');
+    measure.setEnabled(next === 'measure');
+    // モードを持っているのはここなので、既定のカーソルもここで決める。
+    // 手動のときだけ、頂点に重なった瞬間のカーソルを PolygonDrawer が上書きする。
+    map.getCanvas().style.cursor = next === 'manual' ? '' : 'crosshair';
   }
 
   resetButton.addEventListener('click', () => {
+    if (mode === 'measure') {
+      measure.clear();
+      resetButton.blur();
+      return;
+    }
+
     // 保存済みの 1 枚は残したまま、次の田んぼを描き始める。
     detectionToken += 1;
     activeId = null;
@@ -296,9 +339,9 @@ map.on('style.load', () => {
   for (const input of modeInputs) {
     input.addEventListener('change', () => {
       if (!input.checked) return;
-      setAutoMode(input.value === 'auto');
+      setMode(input.value as Mode);
       // 13MB の読み込みは、クリックを待たずに始めておく。
-      if (autoMode) void loadOpenCV().catch(() => undefined);
+      if (mode === 'auto') void loadOpenCV().catch(() => undefined);
       detection = { status: 'idle' };
       notice = null;
       render();
@@ -346,7 +389,7 @@ map.on('style.load', () => {
   });
 
   map.on('click', async (event) => {
-    if (!autoMode || detection.status === 'running') return;
+    if (mode !== 'auto' || detection.status === 'running') return;
 
     const token = (detectionToken += 1);
     // クリックした瞬間のカメラ。タイル待ちのあいだに地図を動かされると、
@@ -382,7 +425,7 @@ map.on('style.load', () => {
       drawer.load(vertices);
       detection = { status: 'idle' };
       // 検出結果は下書き。そのまま頂点を直せるよう、手動（編集）に戻す。
-      setAutoMode(false);
+      setMode('manual');
     } catch (error) {
       if (token !== detectionToken) return;
       detection = {
