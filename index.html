@@ -12,6 +12,7 @@
         <header id="sidebar-header">
           <h1>中里 田んぼマップ</h1>
           <button id="settings-open" type="button" aria-label="設定"></button>
+          <button id="list-close" type="button" aria-label="一覧を閉じる"></button>
         </header>
 
         <ul id="items"></ul>
@@ -27,18 +28,21 @@
       <div id="stage">
         <div id="map"></div>
 
+        <!-- 画面が狭いとき、一覧はここから開く。広いときは左に出ているので出さない。 -->
+        <button id="list-open" type="button" aria-label="一覧"></button>
+
         <div id="topbar">
           <div id="mode" role="radiogroup" aria-label="モード">
-            <label><input type="radio" name="mode" value="view" checked disabled />表示</label>
-            <label><input type="radio" name="mode" value="edit" disabled />編集</label>
+            <label><input type="radio" name="mode" value="view" checked disabled /><span>表示</span></label>
+            <label><input type="radio" name="mode" value="edit" disabled /><span>編集</span></label>
           </div>
 
           <div id="toolbar" hidden>
             <div id="tools" role="radiogroup" aria-label="ツール">
-              <label><input type="radio" name="tool" value="manual" checked />手動範囲</label>
-              <label><input type="radio" name="tool" value="auto" />自動検出</label>
-              <label><input type="radio" name="tool" value="measure" />メジャー</label>
-              <label><input type="radio" name="tool" value="pin" />ピン</label>
+              <label data-icon="polyline"><input type="radio" name="tool" value="manual" checked /><span>手動範囲</span></label>
+              <label data-icon="wand_stars"><input type="radio" name="tool" value="auto" /><span>自動検出</span></label>
+              <label data-icon="straighten"><input type="radio" name="tool" value="measure" /><span>メジャー</span></label>
+              <label data-icon="location_on"><input type="radio" name="tool" value="pin" /><span>ピン</span></label>
             </div>
           </div>
         </div>

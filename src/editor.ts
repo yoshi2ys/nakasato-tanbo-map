@@ -1,5 +1,11 @@
 import type { FeatureCollection } from 'geojson';
-import { GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent, type Point } from 'maplibre-gl';
+import {
+  GeoJSONSource,
+  type Map as MapLibreMap,
+  type MapMouseEvent,
+  type MapTouchEvent,
+  type Point,
+} from 'maplibre-gl';
 import { isTyping } from './ui/dom';
 import {
   isSelfIntersecting,
@@ -14,6 +20,8 @@ import {
 const SNAP_PIXELS = 12;
 /** 頂点・ゴーストを掴める距離（スクリーン座標 px）。 */
 const HIT_PIXELS = 9;
+/** 指で掴むときの距離。指先は矢印より太いので広く取る。 */
+const TOUCH_HIT_PIXELS = 20;
 /** 中点ゴーストを出す辺の最小の長さ（スクリーン座標 px）。 */
 const MIN_GHOST_EDGE_PIXELS = 32;
 
@@ -84,6 +92,8 @@ export class ItemEditor {
   #selected: number | null = null;
   /** ドラッグ中の頂点。 */
   #dragging: number | null = null;
+  /** 指で操作しているか。掴める距離が変わる。 */
+  #touching = false;
   /** 頂点が変わったときだけ計算する。カーソル移動では変わらない。 */
   #areaSquareMeters: number | null = null;
   #totalMeters: number | null = null;
@@ -112,6 +122,7 @@ export class ItemEditor {
     this.#map.on('mousemove', this.#handleMouseMove);
     this.#map.on('mouseout', this.#handleMouseOut);
     this.#map.on('mousedown', this.#handleMouseDown);
+    this.#map.on('touchstart', this.#handleTouchStart);
     this.#map.on('contextmenu', this.#handleContextMenu);
     window.addEventListener('keydown', this.#handleKeyDown);
   }
@@ -121,6 +132,7 @@ export class ItemEditor {
     this.#map.off('mousemove', this.#handleMouseMove);
     this.#map.off('mouseout', this.#handleMouseOut);
     this.#map.off('mousedown', this.#handleMouseDown);
+    this.#map.off('touchstart', this.#handleTouchStart);
     this.#map.off('contextmenu', this.#handleContextMenu);
     window.removeEventListener('keydown', this.#handleKeyDown);
   }
@@ -279,6 +291,54 @@ export class ItemEditor {
     this.#commitVertices();
   };
 
+  /**
+   * 指で頂点を掴む。
+   *
+   * maplibre はタップを click に直してくれるので頂点を置くのは同じ経路で済むが、
+   * ドラッグは touch のまま来る。2 本指は地図の拡大縮小なので手を出さない。
+   */
+  #handleTouchStart = (event: MapTouchEvent): void => {
+    if (this.#phase !== 'editing' || event.points.length > 1) return;
+
+    this.#touching = true;
+    const hit = this.#hitTest(event.point);
+    if (hit === null) {
+      this.#touching = false;
+      return;
+    }
+
+    // 掴んでいるあいだ地図を動かさない。
+    event.preventDefault();
+
+    if (hit.role === 'ghost') {
+      this.#vertices.splice(hit.index + 1, 0, this.#edgeMidpoint(hit.index));
+      this.#dragging = hit.index + 1;
+    } else {
+      this.#dragging = hit.index;
+    }
+
+    this.#selected = this.#dragging;
+    this.#map.on('touchmove', this.#handleTouchMove);
+    this.#map.once('touchend', this.#handleTouchEnd);
+    this.#map.once('touchcancel', this.#handleTouchEnd);
+    this.#commitVertices();
+  };
+
+  #handleTouchMove = (event: MapTouchEvent): void => {
+    if (this.#dragging === null) return;
+    event.preventDefault();
+    this.#vertices[this.#dragging] = event.lngLat.toArray();
+    this.#commitVertices(true);
+  };
+
+  #handleTouchEnd = (): void => {
+    this.#map.off('touchmove', this.#handleTouchMove);
+    this.#touching = false;
+    if (this.#dragging === null) return;
+    this.#dragging = null;
+    this.#render();
+  };
+
   #handleDragMove = (event: MapMouseEvent): void => {
     if (this.#dragging === null) return;
 
@@ -300,6 +360,7 @@ export class ItemEditor {
 
   #endDrag(): void {
     this.#map.off('mousemove', this.#handleDragMove);
+    this.#map.off('touchmove', this.#handleTouchMove);
     window.removeEventListener('mouseup', this.#handleDragEnd);
     this.#dragging = null;
   }
@@ -366,7 +427,7 @@ export class ItemEditor {
    */
   #hitTest(point: Point): Hit | null {
     let hit: Hit | null = null;
-    let best = HIT_PIXELS;
+    let best = this.#touching ? TOUCH_HIT_PIXELS : HIT_PIXELS;
 
     for (const [index, position] of this.#vertices.entries()) {
       const distance = point.dist(this.#map.project(position));

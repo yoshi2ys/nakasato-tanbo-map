@@ -24,7 +24,8 @@ import { PinLayer } from './pins';
 import { DetectPreview, PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID } from './preview';
 import { loadSettings, storeSettings, type Settings } from './settings';
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
-import { element, isTyping } from './ui/dom';
+import { iconSvg } from './icons';
+import { element, isTyping, setIcon } from './ui/dom';
 import { Inspector } from './ui/inspector';
 import { Sidebar } from './ui/sidebar';
 import { SettingsSheet } from './ui/settingsSheet';
@@ -73,12 +74,23 @@ export function startApp(): void {
   const modeInputs = [...document.querySelectorAll<HTMLInputElement>('#mode input')];
   const toolInputs = [...document.querySelectorAll<HTMLInputElement>('#tools input')];
   const toolbar = element('toolbar');
+  // ツールの記号は data-icon で HTML 側に書いてある。文字の上に置く。
+  for (const label of document.querySelectorAll<HTMLElement>('#tools label[data-icon]')) {
+    label.prepend(iconSvg(label.dataset['icon'] ?? 'crop_free', 20));
+  }
   const exportButton = element<HTMLButtonElement>('export');
   const importButton = element<HTMLButtonElement>('import');
   const importFile = element<HTMLInputElement>('import-file');
   const offlineStatus = element('offline-status');
   const offlineSaveButton = element<HTMLButtonElement>('offline-save');
   const offlineClearButton = element<HTMLButtonElement>('offline-clear');
+  const listOpenButton = element<HTMLButtonElement>('list-open');
+  const listCloseButton = element<HTMLButtonElement>('list-close');
+  const app = element('app');
+  setIcon(listOpenButton, 'list_alt');
+  setIcon(listCloseButton, 'close');
+  listOpenButton.addEventListener('click', () => app.classList.add('list-open'));
+  listCloseButton.addEventListener('click', () => app.classList.remove('list-open'));
 
   let settings: Settings = loadSettings();
   const map: MapLibreMap = createMap(element('map'));
@@ -397,6 +409,7 @@ export function startApp(): void {
       } else {
         inspector.render(selected, selected !== null && selected.id === editingId);
       }
+      app.classList.toggle('has-selection', selected !== null);
     }
 
     // MARK: - 地図のクリック

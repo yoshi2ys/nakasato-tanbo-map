@@ -156,7 +156,8 @@ export function createMap(container: HTMLElement): MapLibreMap {
 
   map.touchZoomRotate.disableRotation();
 
-  map.addControl(new AttributionControl({ compact: false }));
+  // 出典は必ず読めるようにしつつ、画面が狭いときは畳む（既定の自動判定に任せる）。
+  map.addControl(new AttributionControl());
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
   map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
 
