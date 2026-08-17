@@ -24,11 +24,10 @@ button {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr) 0;
-  transition: grid-template-columns 0.18s ease;
-}
-
-#app.inspector-open {
+  /*
+   * 右の列は選んでいなくても空けておく。開け閉めすると地図の幅が変わり、
+   * 同じ場所を指したつもりのクリックが別の場所に落ちる。
+   */
   grid-template-columns: 260px minmax(0, 1fr) 280px;
 }
 
@@ -347,8 +346,24 @@ li.selected .item-name {
   background: #fbfbfd;
 }
 
-#inspector[hidden] {
+#inspector-empty {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #86868b;
+}
+
+#inspector-empty[hidden],
+#inspector-body[hidden] {
   display: none;
+}
+
+#inspector-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
 }
 
 #inspector-header {

@@ -28,6 +28,7 @@ import { createMap, tileSources } from './map';
 import { MeasureLabels } from './measureLabels';
 import { applyOverlaySettings, OVERLAY_LAYER_IDS } from './overlays';
 import { PinLayer } from './pins';
+import { DetectPreview, PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID } from './preview';
 import { loadSettings, storeSettings, type Settings } from './settings';
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
 import { element } from './ui/dom';
@@ -81,10 +82,12 @@ export function startApp(): void {
   const offlineStatus = element('offline-status');
   const offlineSaveButton = element<HTMLButtonElement>('offline-save');
   const offlineClearButton = element<HTMLButtonElement>('offline-clear');
-  const app = element('app');
 
   let settings: Settings = loadSettings();
   const map: MapLibreMap = createMap(element('map'), settings);
+  // ブラウザから回す確認用の窓口。地図の状態（レイヤーの可視や濃さ）は DOM に出ないので、
+  // ここから読めるようにしておく。読むだけで、アプリはこれを使わない。
+  (window as unknown as { __tanboMap: MapLibreMap }).__tanboMap = map;
 
   let ready = false;
   let mode: AppMode = 'view';
@@ -105,8 +108,6 @@ export function startApp(): void {
    * その時点ではまだ一覧もインスペクタも存在しない。
    */
   let wired = false;
-  /** 右の列が開いているか。開閉のたびに地図の大きさが変わる。 */
-  let lastInspectorOpen = false;
 
   // レイヤーもソースも、スタイルができるまでは足せない。地図まわりの組み立ては
   // すべてここから始める。
@@ -124,6 +125,7 @@ export function startApp(): void {
     const itemLayer = new ItemLayer(map, 'tanbo-edit-fill');
     const pinLayer = new PinLayer(map, (id) => selectItem(id));
     const labels = new MeasureLabels(map);
+    const preview = new DetectPreview(map, (masked) => setDetectionMasked(masked), 'tanbo-edit-fill');
     const sidebar = new Sidebar({
       onSelect: (id) => selectItem(id),
       onToggleVisible: (id) => toggleVisible(id),
@@ -306,6 +308,7 @@ export function startApp(): void {
       if (next === 'view') {
         commitEditing();
         editor.setEnabled(false);
+        preview.setEnabled(false);
       } else {
         editor.setEnabled(tool !== 'auto');
         const item = selectedItem();
@@ -322,6 +325,7 @@ export function startApp(): void {
 
       // 自動検出のあいだはクリックを検出側に譲る。
       editor.setEnabled(mode === 'edit' && next !== 'auto');
+      preview.setEnabled(mode === 'edit' && next === 'auto');
       if (next === 'auto') void loadOpenCV().catch(() => undefined);
       if (restart && next !== 'auto') {
         editor.begin(TOOL_KIND[next], defaultColor(KIND_OF_TOOL[next]));
@@ -396,21 +400,26 @@ export function startApp(): void {
       } else {
         inspector.render(selected, selected !== null && selected.id === editingId);
       }
-      // 編集中は常に右の列を空けておく。描いている途中で列が開くと地図が横にずれ、
-      // 次のクリックが狙った場所に落ちない。
-      const wantsInspector = inspector.open || mode === 'edit';
-      if (app.classList.toggle('inspector-open', wantsInspector) !== lastInspectorOpen) {
-        lastInspectorOpen = wantsInspector;
-        // ResizeObserver でも追従するが、次のクリックまでに間に合わないことがある。
-        map.resize();
-      }
     }
 
     // MARK: - 地図のクリック
 
+    map.on('mousemove', (event) => {
+      if (mode === 'edit' && tool === 'auto') preview.moved(event.point);
+    });
+
     map.on('click', (event) => {
       if (mode === 'edit') {
-        if (tool === 'auto' && detection.status !== 'running') void detectAt(event.point);
+        if (tool !== 'auto' || detection.status === 'running') return;
+        // 見えている輪郭があれば、それをそのまま確定する。
+        // 別のものが出てくると、何を確定したのか分からなくなる。
+        const previewed = preview.commit(event.point);
+        if (previewed !== null) {
+          acceptOutline(previewed);
+          render();
+          return;
+        }
+        void detectAt(event.point);
         return;
       }
 
@@ -457,12 +466,7 @@ export function startApp(): void {
         const vertices = await detectOutline(map, capture, point);
         if (token !== detectionToken) return;
 
-        // 検出結果は下書き。そのまま頂点を直せるよう、手動の編集に移す。
-        commitEditing();
-        setTool('manual', false);
-        editor.load('polygon', vertices, defaultColor('paddy'));
-        edit = { ...edit, phase: 'editing' };
-        syncEditingItem(true);
+        acceptOutline(vertices);
         detection = { status: 'idle' };
       } catch (error) {
         if (token !== detectionToken) return;
@@ -477,10 +481,25 @@ export function startApp(): void {
       }
     }
 
+    /** 検出した輪郭を下書きとして受け取り、そのまま頂点を直せる状態にする。 */
+    function acceptOutline(vertices: Vertex[]): void {
+      commitEditing();
+      preview.clear();
+      setTool('manual', false);
+      editor.load('polygon', vertices, defaultColor('paddy'));
+      edit = { ...edit, phase: 'editing' };
+      syncEditingItem(true);
+    }
+
     /** 自動検出が写真だけを読めるよう、描いたものと重ねた地図を隠す。 */
     function setDetectionMasked(masked: boolean): void {
       itemLayer.setVisible(!masked);
       editor.setLayersVisible(!masked);
+      for (const id of [PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID]) {
+        if (map.getLayer(id) !== undefined) {
+          map.setLayoutProperty(id, 'visibility', masked ? 'none' : 'visible');
+        }
+      }
       for (const id of OVERLAY_LAYER_IDS) {
         if (map.getLayer(id) === undefined) continue;
         // 出していない地図は元から none なので、設定を見て戻す。

@@ -92,6 +92,16 @@ interface Capture {
    * 画面サイズも一緒に見る必要がある。
    */
   camera: string;
+  /** 切り出した左上（デバイス画素）。緯度経度へ戻すときに足し直す。 */
+  origin: { x: number; y: number };
+  /** 画面全体の画素数。面積比の分母を、切り出しても変えないために持つ。 */
+  framePixels: number;
+}
+
+/** カーソルのまわりだけを読むときの指定。CSS ピクセルで一辺を渡す。 */
+export interface CaptureRegion {
+  center: Point;
+  sizePixels: number;
 }
 
 /** カメラと表示サイズの同一性を 1 本の文字列で比べる。 */
@@ -106,26 +116,103 @@ function cameraKey(map: MapLibreMap): string {
  * MapLibre は既定で描画バッファを破棄するので、map.ts で preserveDrawingBuffer を有効にしてある。
  * WebGL の canvas からは 2D コンテキストを取れないため、いったん別の canvas に写す。
  */
-function captureMap(map: MapLibreMap): Capture {
+function captureMap(map: MapLibreMap, region?: CaptureRegion): Capture {
   const source = map.getCanvas();
+  const scale = source.width / source.clientWidth;
+
+  // カーソルのまわりだけを読むと、画素数が 1/4 以下になって検出がその分だけ速くなる。
+  const size = region === undefined ? null : Math.round(region.sizePixels * scale);
+  const left =
+    size === null ? 0 : clampInt(Math.round(region!.center.x * scale) - size / 2, source.width - 1);
+  const top =
+    size === null ? 0 : clampInt(Math.round(region!.center.y * scale) - size / 2, source.height - 1);
+  const width = size === null ? source.width : Math.min(size, source.width - left);
+  const height = size === null ? source.height : Math.min(size, source.height - top);
+
   const canvas = document.createElement('canvas');
-  canvas.width = source.width;
-  canvas.height = source.height;
+  canvas.width = width;
+  canvas.height = height;
 
   const context = canvas.getContext('2d');
   if (context === null) throw new DetectionError('canvas を用意できませんでした');
 
-  context.drawImage(source, 0, 0);
-  const scale = source.width / source.clientWidth;
+  context.drawImage(source, left, top, width, height, 0, 0, width, height);
   // MapLibre のズームは 512px タイル基準なので、CSS ピクセルの分解能は 2^(zoom+1) で割る。
   const metersPerCssPixel =
     (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 1);
   return {
-    imageData: context.getImageData(0, 0, canvas.width, canvas.height),
+    imageData: context.getImageData(0, 0, width, height),
     scale,
     metersPerPixel: metersPerCssPixel / scale,
     camera: cameraKey(map),
+    origin: { x: left, y: top },
+    framePixels: source.width * source.height,
   };
+}
+
+function clampInt(value: number, max: number): number {
+  return Math.min(Math.max(Math.round(value), 0), max);
+}
+
+/**
+ * 撮った 1 枚から、位置を変えて何度も切り出すための控え。
+ *
+ * カーソルを動かすたびに撮り直すと、そのたびに描いたものを隠して 1 フレーム待つことになる。
+ * 写真はカメラが変わらないかぎり同じなので、1 回撮って切り出しだけを変える。
+ */
+export class MapSnapshot {
+  readonly camera: string;
+  readonly #canvas: HTMLCanvasElement;
+  readonly #context: CanvasRenderingContext2D;
+  readonly #scale: number;
+  readonly #metersPerPixel: number;
+
+  private constructor(
+    canvas: HTMLCanvasElement,
+    context: CanvasRenderingContext2D,
+    scale: number,
+    metersPerPixel: number,
+    camera: string
+  ) {
+    this.#canvas = canvas;
+    this.#context = context;
+    this.#scale = scale;
+    this.#metersPerPixel = metersPerPixel;
+    this.camera = camera;
+  }
+
+  static take(map: MapLibreMap): MapSnapshot {
+    const source = map.getCanvas();
+    const canvas = document.createElement('canvas');
+    canvas.width = source.width;
+    canvas.height = source.height;
+    const context = canvas.getContext('2d');
+    if (context === null) throw new DetectionError('canvas を用意できませんでした');
+    context.drawImage(source, 0, 0);
+
+    const scale = source.width / source.clientWidth;
+    const metersPerCssPixel =
+      (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 1);
+    return new MapSnapshot(canvas, context, scale, metersPerCssPixel / scale, cameraKey(map));
+  }
+
+  /** カーソルのまわりだけを切り出す。 */
+  region(center: Point, sizePixels: number): Capture {
+    const size = Math.round(sizePixels * this.#scale);
+    const left = clampInt(Math.round(center.x * this.#scale) - size / 2, this.#canvas.width - 1);
+    const top = clampInt(Math.round(center.y * this.#scale) - size / 2, this.#canvas.height - 1);
+    const width = Math.min(size, this.#canvas.width - left);
+    const height = Math.min(size, this.#canvas.height - top);
+
+    return {
+      imageData: this.#context.getImageData(left, top, width, height),
+      scale: this.#scale,
+      metersPerPixel: this.#metersPerPixel,
+      camera: this.camera,
+      origin: { x: left, y: top },
+      framePixels: this.#canvas.width * this.#canvas.height,
+    };
+  }
 }
 
 export { cameraKey };
@@ -193,10 +280,19 @@ function takeSeedContour(
  * `capture` は呼び出し側が撮る。OpenCV.js の読み込み（初回 13MB）を待つあいだに
  * 地図を動かされると、シードの画面座標と写真がずれるため。
  */
+export interface DetectOptions {
+  /**
+   * 切り出しの縁に触れた輪郭を捨てる。
+   * 縁で切られた塗りの輪郭は、畦ではなく切り取り線をなぞったものになる。
+   */
+  rejectEdgeContact?: boolean;
+}
+
 export async function detectOutline(
   map: MapLibreMap,
   capture: Capture,
-  seed: Point
+  seed: Point,
+  options: DetectOptions = {}
 ): Promise<Vertex[]> {
   const cv = await loadOpenCV();
   const { imageData, scale } = capture;
@@ -205,8 +301,8 @@ export async function detectOutline(
   const clamp = (value: number, max: number): number =>
     Math.min(Math.max(Math.round(value), 0), max - 1);
   const seedPixel = new cv.Point(
-    clamp(seed.x * scale, imageData.width),
-    clamp(seed.y * scale, imageData.height)
+    clamp(seed.x * scale - capture.origin.x, imageData.width),
+    clamp(seed.y * scale - capture.origin.y, imageData.height)
   );
 
   // 確保は try の中で行う。途中で失敗しても、すでに取れた分は finally で解放される。
@@ -265,7 +361,12 @@ export async function detectOutline(
     contour = takeSeedContour(cv, contours, seedPixel);
     if (contour === null) throw new DetectionError(NOT_FOUND);
 
-    const ratio = cv.contourArea(contour) / (rgb.cols * rgb.rows);
+    if (options.rejectEdgeContact === true && touchesEdge(filled)) {
+      throw new DetectionError(NOT_FOUND);
+    }
+
+    // 分母は切り出しではなく画面全体。切り出しの面積で割ると、同じ閾値が別の意味になる。
+    const ratio = cv.contourArea(contour) / capture.framePixels;
     if (ratio > MAX_AREA_RATIO) {
       throw new DetectionError('畦道を越えて広がりました。拡大するか、手動で描いてください');
     }
@@ -282,7 +383,10 @@ export async function detectOutline(
     }
 
     return points.map(([x, y]) => {
-      const { lng, lat } = map.unproject([x / scale, y / scale]);
+      const { lng, lat } = map.unproject([
+        (x + capture.origin.x) / scale,
+        (y + capture.origin.y) / scale,
+      ]);
       return [lng, lat] satisfies Vertex;
     });
   } catch (error) {
@@ -291,6 +395,20 @@ export async function detectOutline(
     for (const mat of [source, rgb, mask, filled, kernel, hierarchy, contour]) mat?.delete();
     contours?.delete();
   }
+}
+
+/** 塗りが切り出しの外周に触れているか。触れていれば、その先は読めていない。 */
+function touchesEdge(filled: Mat): boolean {
+  const last = { row: filled.rows - 1, col: filled.cols - 1 };
+  for (let col = 0; col < filled.cols; col += 1) {
+    if (filled.ucharPtr(0, col)[0] !== 0) return true;
+    if (filled.ucharPtr(last.row, col)[0] !== 0) return true;
+  }
+  for (let row = 0; row < filled.rows; row += 1) {
+    if (filled.ucharPtr(row, 0)[0] !== 0) return true;
+    if (filled.ucharPtr(row, last.col)[0] !== 0) return true;
+  }
+  return false;
 }
 
 export { captureMap };

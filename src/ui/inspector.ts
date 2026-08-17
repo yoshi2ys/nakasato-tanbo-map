@@ -23,7 +23,8 @@ export interface InspectorCallbacks {
  * 入力欄は打つそばから反映する。保存はアプリ側でまとめて遅らせる。
  */
 export class Inspector {
-  readonly #root = element('inspector');
+  readonly #body = element('inspector-body');
+  readonly #empty = element('inspector-empty');
   readonly #kind = element('inspector-kind');
   readonly #nameField = element('inspector-name-field');
   readonly #name = element<HTMLInputElement>('inspector-name');
@@ -66,18 +67,20 @@ export class Inspector {
     this.#closeButton.addEventListener('click', () => this.#callbacks.onClose());
   }
 
-  get open(): boolean {
-    return !this.#root.hidden;
-  }
-
   /**
    * まだ確定していない描きかけの数値だけを出す。
    * 名前も色もまだ無いので、面積と長さの欄だけを使う。
    */
   renderDraft(areaSquareMeters: number | null, totalMeters: number | null): void {
     this.#item = null;
-    this.#root.hidden = areaSquareMeters === null && totalMeters === null;
-    if (this.#root.hidden) return;
+    const empty = areaSquareMeters === null && totalMeters === null;
+    this.#body.hidden = empty;
+    this.#empty.hidden = !empty;
+    this.#closeButton.hidden = true;
+    if (empty) {
+      this.#kind.textContent = '選択なし';
+      return;
+    }
 
     this.#kind.textContent = areaSquareMeters === null ? '計測' : '田んぼ';
     this.#name.value = '';
@@ -102,8 +105,13 @@ export class Inspector {
 
   render(item: Item | null, editing: boolean): void {
     this.#item = item;
-    this.#root.hidden = item === null;
-    if (item === null) return;
+    this.#body.hidden = item === null;
+    this.#empty.hidden = item !== null;
+    this.#closeButton.hidden = item === null;
+    if (item === null) {
+      this.#kind.textContent = '選択なし';
+      return;
+    }
 
     this.#nameField.hidden = false;
     this.#colorField.hidden = false;
