@@ -311,6 +311,7 @@ export function startApp(): void {
         preview.setEnabled(false);
       } else {
         editor.setEnabled(tool !== 'auto');
+        preview.setEnabled(tool === 'auto');
         const item = selectedItem();
         if (item !== null) loadIntoEditor(item);
       }
@@ -405,7 +406,10 @@ export function startApp(): void {
     // MARK: - 地図のクリック
 
     map.on('mousemove', (event) => {
-      if (mode === 'edit' && tool === 'auto') preview.moved(event.point);
+      // クリックの検出が走っているあいだは下見を止める。同じレイヤーを隠し合う。
+      if (mode === 'edit' && tool === 'auto' && detection.status !== 'running') {
+        preview.moved(event.point);
+      }
     });
 
     map.on('click', (event) => {
@@ -451,13 +455,20 @@ export function startApp(): void {
 
       try {
         // 描いたものや重ねた地図が写り込むと、その線がフラッドフィルの壁になる。
+        // タイルを待つのは隠す前。隠したまま待つと、そのあいだ描いたものが消えて見える。
+        await waitForIdle(map);
+        if (cameraKey(map) !== clickedCamera) {
+          throw new DetectionError('地図が動きました。もう一度クリックしてください');
+        }
+
         setDetectionMasked(true);
         let capture;
         try {
-          await waitForIdle(map);
-          if (cameraKey(map) !== clickedCamera) {
-            throw new DetectionError('地図が動きました。もう一度クリックしてください');
-          }
+          // 隠した状態が画に出るまで 1 フレーム待つ。
+          await new Promise((resolve) => {
+            map.once('render', () => resolve(undefined));
+            map.triggerRepaint();
+          });
           capture = captureMap(map);
         } finally {
           setDetectionMasked(false);
@@ -491,8 +502,19 @@ export function startApp(): void {
       syncEditingItem(true);
     }
 
-    /** 自動検出が写真だけを読めるよう、描いたものと重ねた地図を隠す。 */
+    /**
+     * 自動検出が写真だけを読めるよう、描いたものと重ねた地図を隠す。
+     *
+     * 下見とクリックの検出は同時に走りうる。真偽値で持つと、先に終わったほうの後始末で
+     * もう片方の撮影中に絵が戻り、描いた線が写り込んでフラッドフィルの壁になる。
+     */
+    let maskDepth = 0;
     function setDetectionMasked(masked: boolean): void {
+      maskDepth = Math.max(0, maskDepth + (masked ? 1 : -1));
+      applyDetectionMask(maskDepth > 0);
+    }
+
+    function applyDetectionMask(masked: boolean): void {
       itemLayer.setVisible(!masked);
       editor.setLayersVisible(!masked);
       for (const id of [PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID]) {

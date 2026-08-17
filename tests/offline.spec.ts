@@ -25,6 +25,7 @@ test.describe('オフラインで使う', () => {
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null, null, {
       timeout: 30_000,
     });
+    await openSettings(page);
     page.on('dialog', (dialog) => void dialog.accept());
     // 通信を切ったあとに 1 本でも取りに行っていれば、ためたつもりのものが足りていない。
     // 画が出ているかだけを見ると、maplibre が粗いタイルで埋めた場合を見逃す。

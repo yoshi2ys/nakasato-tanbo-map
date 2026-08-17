@@ -53,11 +53,6 @@ export class DetectPreview {
     if (!enabled) this.clear();
   }
 
-  setColor(color: string): void {
-    this.#map.setPaintProperty(PREVIEW_FILL_LAYER_ID, 'fill-color', color);
-    this.#map.setPaintProperty(PREVIEW_LINE_LAYER_ID, 'line-color', color);
-  }
-
   /** カーソルが動いた。止まるまで待ってから 1 回だけ走らせる。 */
   moved(point: Point): void {
     if (!this.#enabled) return;
@@ -160,9 +155,11 @@ export class DetectPreview {
     const current = this.#snapshot;
     if (current !== null && current.camera === cameraKey(this.#map)) return current;
 
+    // タイルを待つのは隠す前。隠したまま何秒も待つと、そのあいだ描いたものが消えて見える。
+    await waitForIdle(this.#map);
+
     this.#mask(true);
     try {
-      await waitForIdle(this.#map);
       // 隠した状態が画に出るまで 1 フレーム待つ。待たないと隠す前の絵を撮ってしまう。
       await new Promise((resolve) => {
         this.#map.once('render', () => resolve(undefined));

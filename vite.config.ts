@@ -22,6 +22,7 @@ export default defineConfig({
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#ffffff',
+        icons: [{ src: 'favicon.svg', sizes: 'any', type: 'image/svg+xml' }],
       },
       workbox: {
         // アプリ本体（数百 KB）だけを先に取っておく。写真タイルは src/tileCache.ts が

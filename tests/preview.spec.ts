@@ -5,29 +5,26 @@ import {
   itemRows,
   openApp,
   PADDY_SEEDS,
+  setMode,
   setTool,
   startEditing,
 } from './helpers';
 
-/** プレビューのポリゴンの頂点数。地図の中を覗いて数える。 */
-async function previewVertices(page: import('@playwright/test').Page): Promise<number> {
+/**
+ * いま下見に出ている輪郭の数。
+ *
+ * 画素で見ると、確定した田んぼと同じ色なので見分けられない。地図のソースを直接覗く。
+ */
+async function previewCount(page: import('@playwright/test').Page): Promise<number> {
   return page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>('#map canvas');
-    if (canvas === null) return 0;
-    // 破線の色（#ffb300）が出ている画素を数える。プレビューは薄いので少なめに出る。
-    const copy = document.createElement('canvas');
-    copy.width = canvas.width;
-    copy.height = canvas.height;
-    const context = copy.getContext('2d');
-    if (context === null) return 0;
-    context.drawImage(canvas, 0, 0);
-    const { data } = context.getImageData(0, 0, copy.width, copy.height);
-    let count = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const [red, green, blue] = [data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0];
-      if (red > 215 && green > 140 && green < 205 && blue < 70) count += 1;
+    interface MapHandle {
+      queryRenderedFeatures(options: { layers: string[] }): unknown[];
     }
-    return count;
+    const map = (window as unknown as { __tanboMap?: MapHandle }).__tanboMap;
+    if (map === undefined) throw new Error('地図が公開されていません');
+    // いま実際に描かれているものを数える。ソースの中身ではなく、画に出ているかを見たい。
+    // 1 枚のポリゴンでもタイルをまたぐと複数に割れて返るので、数ではなく有無で使う。
+    return map.queryRenderedFeatures({ layers: ['tanbo-preview-fill'] }).length;
   });
 }
 
@@ -48,11 +45,11 @@ test.describe('自動検出の下見', () => {
 
   test('カーソルを止めると輪郭が出て、クリックで確定する', async ({ page }) => {
     const seed = PADDY_SEEDS[1]!;
-    expect(await previewVertices(page)).toBe(0);
+    expect(await previewCount(page)).toBe(0);
 
     await page.mouse.move(...seed);
     // 静止 200ms から検出まで、初回は撮影のぶん少し待つ。
-    await expect.poll(() => previewVertices(page), { timeout: 20_000 }).toBeGreaterThan(100);
+    await expect.poll(() => previewCount(page), { timeout: 20_000 }).toBeGreaterThan(0);
 
     // 下見のあいだは何も作らないし、案内も変わらない。
     expect(await itemRows(page)).toHaveLength(0);
@@ -70,7 +67,7 @@ test.describe('自動検出の下見', () => {
 
   test('地図を動かすと下見は消える', async ({ page }) => {
     await page.mouse.move(...PADDY_SEEDS[1]!);
-    await expect.poll(() => previewVertices(page), { timeout: 20_000 }).toBeGreaterThan(100);
+    await expect.poll(() => previewCount(page), { timeout: 20_000 }).toBeGreaterThan(0);
 
     await page.mouse.move(900, 400);
     await page.mouse.down();
@@ -79,15 +76,26 @@ test.describe('自動検出の下見', () => {
     await page.waitForTimeout(400);
 
     // 動かしたあとの輪郭は、もう写真と合っていない。
+    expect(await previewCount(page)).toBe(0);
     expect(await itemRows(page)).toHaveLength(0);
+  });
+
+  test('表示に戻ってから編集に入り直しても下見は動く', async ({ page }) => {
+    await setMode(page, 'view');
+    await setMode(page, 'edit');
+
+    // 道具は自動検出のまま。ここで動かなくなると、見た目は同じなのに何も出ない。
+    await expect(page.locator('#tools input[value="auto"]')).toBeChecked();
+    await page.mouse.move(...PADDY_SEEDS[1]!);
+    await expect.poll(() => previewCount(page), { timeout: 20_000 }).toBeGreaterThan(0);
   });
 
   test('道具を離れると下見も止まる', async ({ page }) => {
     await page.mouse.move(...PADDY_SEEDS[1]!);
-    await expect.poll(() => previewVertices(page), { timeout: 20_000 }).toBeGreaterThan(100);
+    await expect.poll(() => previewCount(page), { timeout: 20_000 }).toBeGreaterThan(0);
 
     await setTool(page, 'manual');
     await page.waitForTimeout(400);
-    expect(await previewVertices(page)).toBe(0);
+    expect(await previewCount(page)).toBe(0);
   });
 });

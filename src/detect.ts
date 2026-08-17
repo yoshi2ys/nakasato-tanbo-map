@@ -98,12 +98,6 @@ interface Capture {
   framePixels: number;
 }
 
-/** カーソルのまわりだけを読むときの指定。CSS ピクセルで一辺を渡す。 */
-export interface CaptureRegion {
-  center: Point;
-  sizePixels: number;
-}
-
 /** カメラと表示サイズの同一性を 1 本の文字列で比べる。 */
 function cameraKey(map: MapLibreMap): string {
   const center = map.getCenter();
@@ -116,18 +110,10 @@ function cameraKey(map: MapLibreMap): string {
  * MapLibre は既定で描画バッファを破棄するので、map.ts で preserveDrawingBuffer を有効にしてある。
  * WebGL の canvas からは 2D コンテキストを取れないため、いったん別の canvas に写す。
  */
-function captureMap(map: MapLibreMap, region?: CaptureRegion): Capture {
+function captureMap(map: MapLibreMap): Capture {
   const source = map.getCanvas();
   const scale = source.width / source.clientWidth;
-
-  // カーソルのまわりだけを読むと、画素数が 1/4 以下になって検出がその分だけ速くなる。
-  const size = region === undefined ? null : Math.round(region.sizePixels * scale);
-  const left =
-    size === null ? 0 : clampInt(Math.round(region!.center.x * scale) - size / 2, source.width - 1);
-  const top =
-    size === null ? 0 : clampInt(Math.round(region!.center.y * scale) - size / 2, source.height - 1);
-  const width = size === null ? source.width : Math.min(size, source.width - left);
-  const height = size === null ? source.height : Math.min(size, source.height - top);
+  const { width, height } = source;
 
   const canvas = document.createElement('canvas');
   canvas.width = width;
@@ -136,7 +122,7 @@ function captureMap(map: MapLibreMap, region?: CaptureRegion): Capture {
   const context = canvas.getContext('2d');
   if (context === null) throw new DetectionError('canvas を用意できませんでした');
 
-  context.drawImage(source, left, top, width, height, 0, 0, width, height);
+  context.drawImage(source, 0, 0);
   // MapLibre のズームは 512px タイル基準なので、CSS ピクセルの分解能は 2^(zoom+1) で割る。
   const metersPerCssPixel =
     (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 1);
@@ -145,8 +131,8 @@ function captureMap(map: MapLibreMap, region?: CaptureRegion): Capture {
     scale,
     metersPerPixel: metersPerCssPixel / scale,
     camera: cameraKey(map),
-    origin: { x: left, y: top },
-    framePixels: source.width * source.height,
+    origin: { x: 0, y: 0 },
+    framePixels: width * height,
   };
 }
 
@@ -361,7 +347,7 @@ export async function detectOutline(
     contour = takeSeedContour(cv, contours, seedPixel);
     if (contour === null) throw new DetectionError(NOT_FOUND);
 
-    if (options.rejectEdgeContact === true && touchesEdge(filled)) {
+    if (options.rejectEdgeContact === true && touchesEdge(contour, rgb.cols, rgb.rows)) {
       throw new DetectionError(NOT_FOUND);
     }
 
@@ -397,16 +383,18 @@ export async function detectOutline(
   }
 }
 
-/** 塗りが切り出しの外周に触れているか。触れていれば、その先は読めていない。 */
-function touchesEdge(filled: Mat): boolean {
-  const last = { row: filled.rows - 1, col: filled.cols - 1 };
-  for (let col = 0; col < filled.cols; col += 1) {
-    if (filled.ucharPtr(0, col)[0] !== 0) return true;
-    if (filled.ucharPtr(last.row, col)[0] !== 0) return true;
-  }
-  for (let row = 0; row < filled.rows; row += 1) {
-    if (filled.ucharPtr(row, 0)[0] !== 0) return true;
-    if (filled.ucharPtr(row, last.col)[0] !== 0) return true;
+/**
+ * 輪郭が切り出しの外周に触れているか。触れていれば、その先は読めていない。
+ *
+ * 見るのはシードの輪郭だけ。塗り全体で見ると、モルフォロジーで切り離した隣の田んぼの
+ * かけらが縁に残っているだけで捨ててしまう——それを切り離すための処理なのに。
+ */
+function touchesEdge(contour: Mat, cols: number, rows: number): boolean {
+  const points = contour.data32S;
+  for (let index = 0; index < points.length; index += 2) {
+    const x = points[index]!;
+    const y = points[index + 1]!;
+    if (x <= 0 || y <= 0 || x >= cols - 1 || y >= rows - 1) return true;
   }
   return false;
 }
