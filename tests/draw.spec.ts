@@ -9,6 +9,7 @@ import {
   EDIT_HINT_MIN,
   hint,
   openApp,
+  startEditing,
   startNew,
 } from './helpers';
 
@@ -25,6 +26,7 @@ test.describe('手動でポリゴンを描く', () => {
   test.beforeEach(async ({ page }) => {
     errors = collectErrors(page);
     await openApp(page);
+    await startEditing(page);
   });
 
   test.afterEach(() => {
@@ -33,8 +35,8 @@ test.describe('手動でポリゴンを描く', () => {
 
   test('地図が用意できるまで操作を受け付けない', async ({ page }) => {
     // openApp は用意できるまで待つので、ここでは操作できることだけ確かめる。
-    await expect(page.locator('#mode input[value="auto"]')).toBeEnabled();
-    await expect(page.locator('#reset')).toBeDisabled();
+    await expect(page.locator('#mode input[value="edit"]')).toBeEnabled();
+    await expect(page.locator('#tools input[value="manual"]')).toBeChecked();
     await expect(page.locator('#area')).toBeHidden();
     await expect(hint(page)).toHaveText('クリックで頂点を追加');
   });
@@ -73,7 +75,6 @@ test.describe('手動でポリゴンを描く', () => {
     await clickMap(page, 500, 300);
     await expect(hint(page)).toHaveText('クリックで頂点を追加（Esc で最初からやり直す）');
     await expect(page.locator('#area')).toBeHidden();
-    await expect(page.locator('#reset')).toBeEnabled();
 
     await clickMap(page, 600, 300);
     await expect(page.locator('#area')).toBeHidden();
@@ -138,7 +139,7 @@ test.describe('手動でポリゴンを描く', () => {
     await expect(page.locator('#area-square-meters')).toHaveText(TRIANGLE_100PX);
   });
 
-  test('「新しく描く」の直後でも Enter は閉合として効く', async ({ page }) => {
+  test('道具を押し直した直後でも Enter は閉合として効く', async ({ page }) => {
     await startNew(page);
     for (const [x, y] of [
       [300, 500],
@@ -154,26 +155,10 @@ test.describe('手動でポリゴンを描く', () => {
     expect(await areaSquareMeters(page)).toBeGreaterThan(0);
   });
 
-  test('ボタンにフォーカスがあるときの Enter はやり直しとして扱う', async ({ page }) => {
-    for (const [x, y] of [
-      [300, 500],
-      [400, 500],
-      [350, 600],
-    ] as [number, number][]) {
-      await clickMap(page, x, y);
-    }
-    await page.locator('#reset').focus();
-    await page.keyboard.press('Enter');
-
-    await expect(hint(page)).toHaveText('クリックで頂点を追加');
-    await expect(page.locator('#area')).toBeHidden();
-  });
-
   test('Esc で描きかけを捨てる', async ({ page }) => {
     await clickMap(page, 700, 600);
     await page.keyboard.press('Escape');
 
     await expect(hint(page)).toHaveText('クリックで頂点を追加');
-    await expect(page.locator('#reset')).toBeDisabled();
   });
 });

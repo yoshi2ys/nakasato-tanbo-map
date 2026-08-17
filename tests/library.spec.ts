@@ -9,7 +9,8 @@ import {
   EDIT_HINT,
   hint,
   openApp,
-  paddyRows,
+  startEditing,
+  itemRows,
   startNew,
 } from './helpers';
 
@@ -39,6 +40,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     errors = collectErrors(page);
     work = mkdtempSync(join(tmpdir(), 'tanbo-'));
     await openApp(page);
+    await startEditing(page);
   });
 
   test.afterEach(() => {
@@ -46,32 +48,32 @@ test.describe('複数の田んぼを持ち回る', () => {
   });
 
   test('輪郭を閉じると一覧に保存され、再読み込みしても残る', async ({ page }) => {
-    await expect(page.locator('#library-empty')).toBeVisible();
+    await expect(page.locator('#items-empty')).toBeVisible();
     await expect(page.locator('#export')).toBeDisabled();
 
     await drawPolygon(page, FIRST);
-    let rows = await paddyRows(page);
+    let rows = await itemRows(page);
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.active).toBe(true);
+    expect(rows[0]?.selected).toBe(true);
     await expect(page.locator('#export')).toBeEnabled();
 
     await startNew(page);
     await drawPolygon(page, SECOND);
-    rows = await paddyRows(page);
+    rows = await itemRows(page);
     expect(rows).toHaveLength(2);
     expect(rows[0]?.name).not.toBe(rows[1]?.name);
-    expect(rows.filter((row) => row.active)).toHaveLength(1);
-    const areas = rows.map((row) => row.area);
+    expect(rows.filter((row) => row.selected)).toHaveLength(1);
+    const areas = rows.map((row) => row.value);
 
     // 書き出しは遅らせてあるので、閉じる前に落ち着くのを待つ。
     await page.waitForTimeout(700);
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(page.locator('#mode input[value="auto"]')).toBeEnabled({ timeout: 60_000 });
+    await expect(page.locator('#mode input[value="edit"]')).toBeEnabled({ timeout: 60_000 });
 
-    rows = await paddyRows(page);
+    rows = await itemRows(page);
     expect(rows).toHaveLength(2);
-    expect(rows.map((row) => row.area)).toEqual(areas);
-    expect(rows.every((row) => !row.active)).toBe(true);
+    expect(rows.map((row) => row.value)).toEqual(areas);
+    expect(rows.every((row) => !row.selected)).toBe(true);
   });
 
   test('一覧から選ぶと編集に入り、面積も追従する', async ({ page }) => {
@@ -80,15 +82,15 @@ test.describe('複数の田んぼを持ち回る', () => {
     await drawPolygon(page, SECOND);
 
     // 描いた直後は視点が動いていないので、角の座標がそのまま使える。
-    const before = (await paddyRows(page))[1]?.area;
+    const before = (await itemRows(page))[1]?.value;
     await dragMap(page, [700, 450], [640, 390]);
-    expect((await paddyRows(page))[1]?.area).not.toBe(before);
+    expect((await itemRows(page))[1]?.value).not.toBe(before);
     await dragMap(page, [640, 390], [700, 450]);
-    expect((await paddyRows(page))[1]?.area).toBe(before);
+    expect((await itemRows(page))[1]?.value).toBe(before);
 
-    await page.locator('#paddies li:first-child .paddy-select').click();
+    await page.locator('#items li:first-child .item-select').click();
     await page.waitForTimeout(700);
-    expect((await paddyRows(page))[0]?.active).toBe(true);
+    expect((await itemRows(page))[0]?.selected).toBe(true);
     await expect(hint(page)).toHaveText(EDIT_HINT);
   });
 
@@ -120,13 +122,13 @@ test.describe('複数の田んぼを持ち回る', () => {
     }
 
     acceptNextDialog(page);
-    await page.locator('#paddies li:first-child .paddy-delete').click();
+    await page.locator('#items li:first-child .item-delete').click();
     await page.waitForTimeout(300);
-    expect(await paddyRows(page)).toHaveLength(1);
+    expect(await itemRows(page)).toHaveLength(1);
 
     await page.setInputFiles('#import-file', file);
     await page.waitForTimeout(600);
-    expect(await paddyRows(page)).toHaveLength(3);
+    expect(await itemRows(page)).toHaveLength(3);
   });
 
   test('同じファイルを 2 回読んでも独立した 1 枚として扱う', async ({ page }) => {
@@ -142,15 +144,15 @@ test.describe('複数の田んぼを持ち回る', () => {
     await page.setInputFiles('#import-file', file);
     await page.waitForTimeout(600);
 
-    const rows = await paddyRows(page);
+    const rows = await itemRows(page);
     expect(rows).toHaveLength(3);
     // id が重なっていると、1 枚消したつもりで同じ id の別の枚まで消える。
     expect(new Set(rows.map((row) => row.name)).size).toBe(3);
 
     acceptNextDialog(page);
-    await page.locator('#paddies li:last-child .paddy-delete').click();
+    await page.locator('#items li:last-child .item-delete').click();
     await page.waitForTimeout(300);
-    expect(await paddyRows(page)).toHaveLength(2);
+    expect(await itemRows(page)).toHaveLength(2);
   });
 
   test('交差した輪郭は一覧でも書き出しでも面積を出さない', async ({ page }) => {
@@ -162,7 +164,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     ]);
     await dragMap(page, [400, 250], [820, 640]);
 
-    expect((await paddyRows(page)).at(-1)?.area).toBe('輪郭が交差');
+    expect((await itemRows(page)).at(-1)?.value).toBe('輪郭が交差');
 
     const download = page.waitForEvent('download');
     await page.locator('#export').click();
@@ -182,14 +184,14 @@ test.describe('複数の田んぼを持ち回る', () => {
     await drawPolygon(page, FIRST);
 
     page.once('dialog', (dialog) => void dialog.dismiss());
-    await page.locator('#paddies li:first-child .paddy-delete').click();
+    await page.locator('#items li:first-child .item-delete').click();
     await page.waitForTimeout(300);
-    expect(await paddyRows(page)).toHaveLength(1);
+    expect(await itemRows(page)).toHaveLength(1);
 
     page.once('dialog', (dialog) => void dialog.accept());
-    await page.locator('#paddies li:first-child .paddy-delete').click();
+    await page.locator('#items li:first-child .item-delete').click();
     await page.waitForTimeout(300);
-    expect(await paddyRows(page)).toHaveLength(0);
+    expect(await itemRows(page)).toHaveLength(0);
   });
 
   test('壊れた GeoJSON は黙って飲み込まない', async ({ page }) => {
@@ -198,7 +200,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     await page.setInputFiles('#import-file', broken);
     await page.waitForTimeout(400);
     await expect(hint(page)).toContainText('読めませんでした');
-    expect(await paddyRows(page)).toHaveLength(0);
+    expect(await itemRows(page)).toHaveLength(0);
 
     // 点は「取り込めないもの」ではなくピンになる。形として読めないものだけを弾く。
     const unusable = join(work, 'unusable.geojson');
@@ -254,6 +256,6 @@ test.describe('複数の田んぼを持ち回る', () => {
 
     await page.setInputFiles('#import-file', multi);
     await page.waitForTimeout(600);
-    expect(await paddyRows(page)).toHaveLength(2);
+    expect(await itemRows(page)).toHaveLength(2);
   });
 });

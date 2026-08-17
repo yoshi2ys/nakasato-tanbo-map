@@ -8,6 +8,7 @@ import {
   EDIT_HINT_MIN,
   hint,
   openApp,
+  startEditing,
 } from './helpers';
 
 /** 編集の検証に使う正方形。角の画面座標が分かっていることが大事。 */
@@ -24,6 +25,7 @@ test.describe('閉じたあとの頂点編集', () => {
   test.beforeEach(async ({ page }) => {
     errors = collectErrors(page);
     await openApp(page);
+    await startEditing(page);
     await drawPolygon(page, SQUARE);
     await expect(hint(page)).toHaveText(EDIT_HINT);
   });

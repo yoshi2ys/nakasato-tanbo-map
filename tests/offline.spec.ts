@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { mapPixels, openApp, waitForApp } from './helpers';
+import { mapPixels, openApp, openSettings, waitForApp } from './helpers';
 
 /**
  * 電波の届かない田んぼで開くための確認。
@@ -39,6 +39,7 @@ test.describe('オフラインで使う', () => {
     page.on('requestfailed', (request) => missed.push(request.url()));
     await page.reload({ waitUntil: 'load' });
     await waitForApp(page, 3000);
+    await openSettings(page);
 
     // 写真が出ていれば、地図はほぼ塗りつぶされる。出ていなければ下地の色だけになる。
     expect(await mapPixels(page, 'covered')).toBeGreaterThan(0.5);
@@ -53,6 +54,7 @@ test.describe('オフラインで使う', () => {
       route.fulfill({ status: 200, contentType: 'image/png', body: ONE_PIXEL_PNG })
     );
     await openApp(page);
+    await openSettings(page);
     page.on('dialog', (dialog) => void dialog.accept());
 
     await page.locator('#offline-save').click();

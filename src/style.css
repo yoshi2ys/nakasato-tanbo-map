@@ -2,8 +2,206 @@ html,
 body {
   margin: 0;
   height: 100%;
+  overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 13px;
   color: #1d1d1f;
+  background: #f5f5f7;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/*
+ * 左に一覧、中央に地図、右にインスペクタ。
+ * パネルを地図の上に浮かせると、中身が増えたぶんだけ地図を覆い、その下へのクリックが
+ * 黙って落ちる（実際に踏んだ）。列に分けておけば、その壊れ方は起こらない。
+ */
+#app {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr) 0;
+  transition: grid-template-columns 0.18s ease;
+}
+
+#app.inspector-open {
+  grid-template-columns: 260px minmax(0, 1fr) 280px;
+}
+
+/* MARK: - サイドバー */
+
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 12px;
+  border-right: 1px solid #e5e5e7;
+  background: #fbfbfd;
+}
+
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+#sidebar-header h1 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#settings-open,
+#inspector-close,
+#settings-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+#settings-open:hover,
+#inspector-close:hover,
+#settings-close:hover {
+  background: #ececf0;
+  color: #1d1d1f;
+}
+
+#items {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+#items li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border-radius: 8px;
+}
+
+#items li.selected {
+  background: #e8f4ff;
+}
+
+#items button {
+  display: flex;
+  align-items: center;
+  padding: 5px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+
+.item-select {
+  flex: 1;
+  min-width: 0;
+  gap: 7px;
+  text-align: left;
+}
+
+.item-select:hover {
+  background: #f0f0f2;
+}
+
+.item-icon {
+  display: flex;
+  flex: none;
+}
+
+.item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+li.selected .item-name {
+  font-weight: 600;
+}
+
+.item-value {
+  flex: none;
+  color: #6e6e73;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.item-visible,
+.item-delete {
+  flex: none;
+  color: #86868b;
+}
+
+.item-visible:hover {
+  color: #1d1d1f;
+}
+
+.item-visible[aria-pressed='false'] {
+  color: #c7c7cc;
+}
+
+.item-visible:disabled {
+  color: #d2d2d7;
+  cursor: default;
+}
+
+.item-delete:hover {
+  color: #c8102e;
+}
+
+#items-empty {
+  margin: 8px 2px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #86868b;
+}
+
+#library-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#library-actions button {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#library-actions button:disabled {
+  color: #b0b0b5;
+  cursor: default;
+}
+
+/* MARK: - 地図とその上のもの */
+
+#stage {
+  position: relative;
+  min-width: 0;
 }
 
 #map {
@@ -11,97 +209,96 @@ body {
   inset: 0;
 }
 
-#panel {
+/*
+ * 地図の上に浮くのは、上のバーとヒントの 2 つだけ。
+ * 右上には地図のズームボタンがいるので、モードもツールも中央にまとめる。
+ */
+#topbar {
   position: absolute;
   top: 12px;
-  left: 12px;
+  left: 50%;
   z-index: 1;
-  min-width: 168px;
-  max-width: 260px;
-  /* max-width に padding を含める。含めないと、中身が増えたぶんパネルが地図側へ張り出し、
-     そこへのクリックが地図に届かなくなる。 */
-  box-sizing: border-box;
-  padding: 14px 16px;
-  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  transform: translateX(-50%);
+  border-radius: 10px;
   background: rgb(255 255 255 / 0.92);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 2px 12px rgb(0 0 0 / 0.18);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.16);
 }
 
-#mode {
+#mode,
+#tools {
   display: flex;
   gap: 2px;
-  margin-bottom: 12px;
-  padding: 2px;
-  border-radius: 8px;
-  background: #f0f0f2;
 }
 
-#mode label {
-  flex: 1;
-  padding: 4px 8px;
-  border-radius: 6px;
+#toolbar {
+  display: flex;
+  padding-left: 8px;
+  border-left: 1px solid #e5e5e7;
+}
+
+#toolbar[hidden] {
+  display: none;
+}
+
+#mode label,
+#tools label {
+  padding: 5px 12px;
+  border-radius: 7px;
   font-size: 12px;
-  text-align: center;
+  white-space: nowrap;
   cursor: pointer;
 }
 
-#mode label:has(:checked) {
-  background: #fff;
+#mode label:has(:checked),
+#tools label:has(:checked) {
+  background: #0071e3;
+  color: #fff;
   font-weight: 600;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
 }
 
-/* radio 本体は隠しているので、フォーカスはラベル側に出す。 */
-#mode label:has(:focus-visible) {
+#mode label:has(:focus-visible),
+#tools label:has(:focus-visible) {
   outline: 2px solid #0071e3;
   outline-offset: 1px;
 }
 
-#mode:has(:disabled) {
+#mode:has(:disabled),
+#tools:has(:disabled) {
   opacity: 0.5;
 }
 
-#mode:has(:disabled) label {
-  cursor: default;
-}
-
-#mode input {
+#mode input,
+#tools input {
   position: absolute;
   opacity: 0;
   pointer-events: none;
 }
 
 #hint {
+  position: absolute;
+  bottom: 30px;
+  left: 50%;
+  z-index: 1;
+  max-width: min(560px, calc(100% - 32px));
   margin: 0;
+  padding: 7px 14px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgb(29 29 31 / 0.78);
+  color: #fff;
   font-size: 12px;
   line-height: 1.5;
-  color: #6e6e73;
+  text-align: center;
+  pointer-events: none;
 }
 
-#measure {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 12px;
-  margin: 12px 0 0;
-  font-variant-numeric: tabular-nums;
-}
-
-/* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
-#measure[hidden] {
-  display: none;
-}
-
-#measure dt {
-  font-size: 12px;
-  color: #6e6e73;
-}
-
-#measure dd {
-  margin: 0;
-  font-size: 19px;
-  font-weight: 600;
-  text-align: right;
+#hint.warning {
+  background: rgb(200 16 46 / 0.85);
 }
 
 /* 辺の長さは MapLibre の Marker として置く。写真の上でも読めるよう地色を敷く。 */
@@ -116,16 +313,157 @@ body {
   pointer-events: none;
 }
 
-#area {
+/* ピンはレイヤーではなく DOM。色は item ごとに変わるので currentColor で塗る。 */
+.pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.92);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+  cursor: pointer;
+}
+
+.pin.selected {
+  outline: 2px solid #fff;
+  outline-offset: 1px;
+  transform: scale(1.12);
+}
+
+/* MARK: - インスペクタ */
+
+#inspector {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+  border-left: 1px solid #e5e5e7;
+  background: #fbfbfd;
+}
+
+#inspector[hidden] {
+  display: none;
+}
+
+#inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#inspector-header h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field > span {
+  font-size: 11px;
+  color: #6e6e73;
+}
+
+.field[hidden] {
+  display: none;
+}
+
+#inspector-name {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+#inspector-colors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#inspector-color {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid #d2d2d7;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+
+#inspector-swatches {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.swatch {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid rgb(0 0 0 / 0.15);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.swatch.selected {
+  outline: 2px solid #0071e3;
+  outline-offset: 1px;
+}
+
+#inspector-icons {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 3px;
+}
+
+.icon-choice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+.icon-choice:hover {
+  background: #ececf0;
+}
+
+.icon-choice.selected {
+  background: #e8f4ff;
+}
+
+#area,
+#measure {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px 12px;
-  margin: 12px 0 0;
+  margin: 0;
   font-variant-numeric: tabular-nums;
 }
 
 /* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
-#area[hidden] {
+#area[hidden],
+#measure[hidden],
+#inspector-position[hidden] {
   display: none;
 }
 
@@ -134,179 +472,142 @@ body {
   opacity: 0.4;
 }
 
-#hint.warning {
-  color: #c8102e;
-}
-
-#area dt {
+#area dt,
+#measure dt {
   font-size: 12px;
   color: #6e6e73;
 }
 
-#area dd {
+#area dd,
+#measure dd {
   margin: 0;
   font-size: 15px;
   text-align: right;
 }
 
-#area dd:first-of-type {
+#area dd:first-of-type,
+#measure dd {
   font-size: 19px;
   font-weight: 600;
 }
 
-#reset {
-  width: 100%;
-  margin-top: 12px;
-  padding: 6px 12px;
-  border: 0;
-  border-radius: 8px;
-  background: #0071e3;
-  color: #fff;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-#reset:disabled {
-  background: #d2d2d7;
-  cursor: default;
-}
-
-#library {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e5e7;
-}
-
-#library-heading {
-  margin: 0 0 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #6e6e73;
-}
-
-#library-empty {
+#inspector-position {
   margin: 0;
   font-size: 11px;
-  line-height: 1.5;
-  color: #86868b;
-}
-
-#paddies {
-  margin: 0;
-  padding: 0;
-  max-height: 168px;
-  overflow-y: auto;
-  list-style: none;
-}
-
-#paddies li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-#paddies button {
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 6px;
-  background: none;
-  color: inherit;
-  font-family: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-/* 名前と面積を出す行そのものが選択ボタン。 */
-.paddy-select {
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  text-align: left;
-}
-
-.paddy-select:hover {
-  background: #f0f0f2;
-}
-
-li.active .paddy-select {
-  background: #e8f4ff;
-  font-weight: 600;
-}
-
-.paddy-area {
   color: #6e6e73;
   font-variant-numeric: tabular-nums;
-  font-weight: 400;
 }
 
-.paddy-delete {
-  color: #86868b;
-}
-
-.paddy-delete:hover {
-  color: #c8102e;
-}
-
-#library-actions {
+#inspector-actions {
   display: flex;
+  flex-direction: column;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: auto;
 }
 
-#library-actions button {
-  flex: 1;
-  padding: 5px 8px;
+#inspector-actions button {
+  padding: 7px 10px;
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   background: #fff;
-  font-family: inherit;
   font-size: 12px;
   cursor: pointer;
 }
 
-#library-actions button:disabled {
-  color: #b0b0b5;
-  cursor: default;
+#inspector-actions button[hidden] {
+  display: none;
 }
 
-#offline {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid #e5e5e7;
+#inspector-delete {
+  color: #c8102e;
 }
 
-#offline-heading {
-  margin: 0 0 6px;
+/* MARK: - 設定 */
+
+#settings {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 0.3);
+}
+
+#settings[hidden] {
+  display: none;
+}
+
+#settings-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: min(420px, calc(100% - 32px));
+  max-height: calc(100% - 64px);
+  padding: 18px;
+  overflow-y: auto;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
+}
+
+#settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+#settings-header h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+#settings section h3 {
+  margin: 0 0 8px;
   font-size: 12px;
   font-weight: 600;
   color: #6e6e73;
 }
 
+.overlay-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.overlay-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 120px;
+  cursor: pointer;
+}
+
+.overlay-row input[type='range'] {
+  flex: 1;
+  accent-color: #0071e3;
+}
+
 #offline-status {
-  margin: 0;
-  font-size: 11px;
-  line-height: 1.5;
-  color: #86868b;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #6e6e73;
   font-variant-numeric: tabular-nums;
 }
 
 #offline-actions {
   display: flex;
   gap: 6px;
-  margin-top: 10px;
 }
 
 #offline-actions button {
-  /* 既定の min-width では文字の幅ぶんだけ縮まず、パネルが max-width を越えて広がる。
-     広がったパネルは地図を覆い、そこへのクリックが地図に届かなくなる。 */
   min-width: 0;
-  padding: 5px 8px;
+  padding: 6px 10px;
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   background: #fff;
-  font-family: inherit;
   font-size: 12px;
   cursor: pointer;
 }
@@ -320,8 +621,13 @@ li.active .paddy-select {
   cursor: default;
 }
 
-/* 検出中や読み込み前は、一覧の選択・削除も受け付けない。 */
-#paddies.locked {
-  opacity: 0.5;
-  pointer-events: none;
+.note {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #86868b;
+}
+
+.note a {
+  color: #6e6e73;
 }

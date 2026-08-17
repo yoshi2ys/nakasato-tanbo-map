@@ -7,8 +7,10 @@ import {
   NO_FIELD_SEED,
   hint,
   openApp,
+  setTool,
+  startEditing,
   PADDY_SEEDS,
-  paddyRows,
+  itemRows,
   startNew,
 } from './helpers';
 
@@ -22,6 +24,7 @@ test.describe('シード 1 点からの自動検出', () => {
   test.beforeEach(async ({ page }) => {
     errors = collectErrors(page);
     await openApp(page);
+    await startEditing(page);
   });
 
   test.afterEach(() => {
@@ -46,10 +49,10 @@ test.describe('シード 1 点からの自動検出', () => {
     // 検出後は手動（編集）に戻る。頂点編集そのものは edit.spec.ts が見ている。
     await expect(hint(page)).toHaveText(EDIT_HINT);
     // 下書きとして一覧にも入り、あとから選び直せる。
-    const rows = await paddyRows(page);
+    const rows = await itemRows(page);
     expect(rows).toHaveLength(1);
-    expect(rows[0]?.active).toBe(true);
-    expect(Number(rows[0]!.area.replace(/[^0-9]/g, ''))).toBe(detected);
+    expect(rows[0]?.selected).toBe(true);
+    expect(Number(rows[0]!.value.replace(/[^0-9]/g, ''))).toBe(detected);
   });
 
   test('複数の圃場を続けて検出でき、2 回目からは速い', async ({ page }) => {
@@ -58,7 +61,7 @@ test.describe('シード 1 点からの自動検出', () => {
     const areas: number[] = [];
     let slowest = 0;
     for (const seed of PADDY_SEEDS) {
-      await startNew(page);
+      await startNew(page, 'auto');
       const elapsed = await detectAt(page, ...seed);
       slowest = Math.max(slowest, elapsed);
       const area = await areaSquareMeters(page);
@@ -86,10 +89,10 @@ test.describe('シード 1 点からの自動検出', () => {
 
   test('メジャーで引いた線が検出の邪魔をしない', async ({ page }) => {
     // 計測の線は写真の上に描かれる。撮影に写り込むとフラッドフィルの壁になる。
-    await page.locator('#mode label:has(input[value="measure"])').click();
-    await page.mouse.click(500, 300);
+    await setTool(page, 'measure');
+    await page.mouse.click(760, 300);
     await page.waitForTimeout(120);
-    await page.mouse.click(620, 340);
+    await page.mouse.click(880, 340);
     await page.waitForTimeout(120);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(200);
@@ -101,14 +104,14 @@ test.describe('シード 1 点からの自動検出', () => {
   });
 
   test('検出中はモードの切り替えを受け付けない', async ({ page }) => {
-    await page.locator('#mode label:has(input[value="auto"])').click();
+    await setTool(page, 'auto');
     await page.mouse.click(...PADDY_SEEDS[1]!);
     // 検出が終わる前に見る。
     await page.waitForTimeout(40);
-    const lockedWhileRunning = await page.locator('#mode input[value="manual"]').isDisabled();
+    const lockedWhileRunning = await page.locator('#tools input[value="manual"]').isDisabled();
 
     await expect(hint(page)).not.toHaveText('検出中…', { timeout: 150_000 });
     expect(lockedWhileRunning).toBe(true);
-    await expect(page.locator('#mode input[value="manual"]')).toBeEnabled();
+    await expect(page.locator('#tools input[value="manual"]')).toBeEnabled();
   });
 });

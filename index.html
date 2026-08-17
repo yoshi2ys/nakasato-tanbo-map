@@ -3,51 +3,131 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>田んぼ輪郭描画ツール</title>
+    <title>中里 田んぼマップ</title>
   </head>
   <body>
-    <div id="map"></div>
-    <div id="panel">
-      <div id="mode" role="radiogroup" aria-label="入力方法">
-        <label><input type="radio" name="mode" value="manual" checked disabled />手動</label>
-        <label><input type="radio" name="mode" value="auto" disabled />自動検出</label>
-        <label><input type="radio" name="mode" value="measure" disabled />メジャー</label>
-      </div>
-      <p id="hint">読み込み中…</p>
-      <dl id="area" hidden>
-        <dt>㎡</dt>
-        <dd id="area-square-meters"></dd>
-        <dt>反</dt>
-        <dd id="area-tan"></dd>
-        <dt>畝</dt>
-        <dd id="area-se"></dd>
-      </dl>
-      <dl id="measure" hidden>
-        <dt>合計</dt>
-        <dd id="measure-total"></dd>
-      </dl>
-      <button id="reset" type="button" disabled>新しく描く</button>
+    <div id="app">
+      <aside id="sidebar">
+        <header id="sidebar-header">
+          <h1>中里 田んぼマップ</h1>
+          <button id="settings-open" type="button" aria-label="設定"></button>
+        </header>
 
-      <section id="library">
-        <h2 id="library-heading">保存した田んぼ</h2>
-        <ul id="paddies"></ul>
-        <p id="library-empty">まだありません。輪郭を閉じると保存されます。</p>
+        <ul id="items"></ul>
+        <p id="items-empty">まだありません。「編集」に切り替えて描くと、ここに並びます。</p>
+
         <div id="library-actions">
           <button id="export" type="button" disabled>書き出す</button>
           <button id="import" type="button" disabled>読み込む</button>
           <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
         </div>
-      </section>
+      </aside>
 
-      <section id="offline">
-        <h2 id="offline-heading">オフライン用の地図</h2>
-        <p id="offline-status">確認中…</p>
-        <div id="offline-actions">
-          <button id="offline-save" type="button" disabled>この範囲を保存</button>
-          <button id="offline-clear" type="button" disabled>消す</button>
+      <div id="stage">
+        <div id="map"></div>
+
+        <div id="topbar">
+          <div id="mode" role="radiogroup" aria-label="モード">
+            <label><input type="radio" name="mode" value="view" checked disabled />表示</label>
+            <label><input type="radio" name="mode" value="edit" disabled />編集</label>
+          </div>
+
+          <div id="toolbar" hidden>
+            <div id="tools" role="radiogroup" aria-label="ツール">
+              <label><input type="radio" name="tool" value="manual" checked />手動範囲</label>
+              <label><input type="radio" name="tool" value="auto" />自動検出</label>
+              <label><input type="radio" name="tool" value="measure" />メジャー</label>
+              <label><input type="radio" name="tool" value="pin" />ピン</label>
+            </div>
+          </div>
         </div>
-      </section>
+
+        <p id="hint">読み込み中…</p>
+      </div>
+
+      <aside id="inspector" hidden>
+        <header id="inspector-header">
+          <h2 id="inspector-kind">田んぼ</h2>
+          <button id="inspector-close" type="button" aria-label="閉じる"></button>
+        </header>
+
+        <label class="field" id="inspector-name-field">
+          <span>名前</span>
+          <input id="inspector-name" type="text" />
+        </label>
+
+        <div class="field" id="inspector-color-field">
+          <span>色</span>
+          <div id="inspector-colors">
+            <input id="inspector-color" type="color" aria-label="色" />
+            <div id="inspector-swatches"></div>
+          </div>
+        </div>
+
+        <div class="field" id="inspector-icon-field" hidden>
+          <span>アイコン</span>
+          <div id="inspector-icons"></div>
+        </div>
+
+        <dl id="area" hidden>
+          <dt>㎡</dt>
+          <dd id="area-square-meters"></dd>
+          <dt>反</dt>
+          <dd id="area-tan"></dd>
+          <dt>畝</dt>
+          <dd id="area-se"></dd>
+        </dl>
+
+        <dl id="measure" hidden>
+          <dt>合計</dt>
+          <dd id="measure-total"></dd>
+        </dl>
+
+        <p id="inspector-position" hidden></p>
+
+        <div id="inspector-actions">
+          <button id="inspector-edit" type="button">この項目を編集</button>
+          <button id="inspector-delete" type="button">削除</button>
+        </div>
+      </aside>
     </div>
+
+    <div id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-heading" hidden>
+      <div id="settings-sheet">
+        <header id="settings-header">
+          <h2 id="settings-heading">設定</h2>
+          <button id="settings-close" type="button" aria-label="閉じる"></button>
+        </header>
+
+        <section>
+          <h3>重ねる地図</h3>
+          <div id="overlay-list"></div>
+        </section>
+
+        <section>
+          <h3>オフライン用の地図</h3>
+          <p id="offline-status">確認中…</p>
+          <div id="offline-actions">
+            <button id="offline-save" type="button" disabled>この範囲を保存</button>
+            <button id="offline-clear" type="button" disabled>消す</button>
+          </div>
+          <p class="note">
+            描いたものはこのブラウザに保存されます。端末を変えるときや念のための控えには、
+            一覧の「書き出す」を使ってください。
+          </p>
+        </section>
+
+        <section>
+          <h3>出典</h3>
+          <p class="note">
+            <a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院タイル</a>（電子国土基本図（オルソ画像）・標準地図・淡色地図・陰影起伏図）／
+            <a href="http://map.city.tokamachi.lg.jp/" target="_blank" rel="noreferrer">十日町市公開地理情報システム 航空写真</a>（私的使用の範囲内で利用）／
+            アイコンは Material Symbols（Apache License 2.0）
+          </p>
+        </section>
+      </div>
+    </div>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

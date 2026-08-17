@@ -7,6 +7,8 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import { addOverlayLayers, overlayTileSources } from './overlays';
+import type { Settings } from './settings';
 import { cachedTileUrl, installTileCache, type TileSource } from './tileCache';
 
 // maplibre-gl は worker を「自分自身の import.meta.url の兄弟ファイル」として実行時に
@@ -73,7 +75,7 @@ function initialCenter(): [lng: number, lat: number] {
 }
 
 /** 写真タイルの出どころ。オフライン用にためるときも、この定義から URL を数える。 */
-export const TILE_SOURCES: TileSource[] = [
+const PHOTO_SOURCES: TileSource[] = [
   { url: GSI_TILE_URL, maxZoom: GSI_MAX_ZOOM, tileSize: TILE_SIZE },
   {
     url: TOKAMACHI_TILE_URL,
@@ -84,7 +86,15 @@ export const TILE_SOURCES: TileSource[] = [
   },
 ];
 
-export function createMap(container: HTMLElement): MapLibreMap {
+/**
+ * オフライン用にためる対象。写真に加えて、いま出している重ねる地図も含める。
+ * 出していないものまで落とすと、枚数が何倍にもなって上限に当たる。
+ */
+export function tileSources(settings: Settings): TileSource[] {
+  return [...PHOTO_SOURCES, ...overlayTileSources(settings)];
+}
+
+export function createMap(container: HTMLElement, _settings: Settings): MapLibreMap {
   const map = new MapLibreMap({
     container,
     center: initialCenter(),
@@ -139,6 +149,10 @@ export function createMap(container: HTMLElement): MapLibreMap {
       ],
     },
   });
+
+  // 重ねる地図は写真の上、描いたものの下。あとから足すと重ね順の管理が崩れるので、
+  // スタイルができた時点で 3 枚とも置いておく（出し入れは visibility で切り替える）。
+  map.on('style.load', () => addOverlayLayers(map));
 
   map.touchZoomRotate.disableRotation();
 
