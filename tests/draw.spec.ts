@@ -3,6 +3,8 @@ import {
   areaSquareMeters,
   clickMap,
   collectErrors,
+  drawPolygon,
+  mapPixels,
   EDIT_HINT,
   EDIT_HINT_MIN,
   hint,
@@ -35,6 +37,36 @@ test.describe('手動でポリゴンを描く', () => {
     await expect(page.locator('#reset')).toBeDisabled();
     await expect(page.locator('#area')).toBeHidden();
     await expect(hint(page)).toHaveText('クリックで頂点を追加');
+  });
+
+  test('パネルは地図のクリック位置を覆わない', async ({ page }) => {
+    const right = async (): Promise<number> =>
+      page.evaluate(() => document.getElementById('panel')?.getBoundingClientRect().right ?? 0);
+
+    // パネルは左上に浮いている。中身が増えて横に広がると、そのぶんの地図が押しやられる
+    // のではなく覆われ、クリックが地図に届かなくなる（頂点が黙って落ちる）。
+    expect(await right()).toBeLessThan(290);
+
+    // 一覧とオフラインの数字が入ると中身が増える。広がるのはそのあとなので、そこまで見る。
+    await drawPolygon(page, [
+      [400, 300],
+      [500, 300],
+      [500, 400],
+    ]);
+    expect(await right()).toBeLessThan(290);
+  });
+
+  test('描いた輪郭が地図にも出る', async ({ page }) => {
+    const before = await mapPixels(page, 'drawn');
+    await drawPolygon(page, [
+      [400, 300],
+      [500, 300],
+      [500, 400],
+    ]);
+    expect(await areaSquareMeters(page)).toBe(Number(TRIANGLE_100PX.replace(',', '')));
+    // 面積だけ出て地図には何も出ない、という壊れ方を捕まえる。100px の三角形で実測 746px
+    // （線はアンチエイリアスで縁が薄まるぶん、周長より少し多い程度）。半分を下限にする。
+    expect(await mapPixels(page, 'drawn')).toBeGreaterThan(before + 370);
   });
 
   test('3 頂点に満たないうちは面積を出さない', async ({ page }) => {

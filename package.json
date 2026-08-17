@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "npm run type-check && vite build",
     "preview": "vite preview",
+    "build:standalone": "npm run type-check && vite build --config vite.standalone.config.ts",
     "type-check": "tsc --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "playwright test",
-    "test:dist": "TANBO_TEST_DIST=1 playwright test"
+    "test:dist": "TANBO_TEST_DIST=1 playwright test",
+    "test:standalone": "npm run build:standalone && TANBO_TEST_STANDALONE=1 playwright test"
   },
   "dependencies": {
     "@techstark/opencv-js": "^5.0.0-release.1",

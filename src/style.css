@@ -18,6 +18,9 @@ body {
   z-index: 1;
   min-width: 168px;
   max-width: 260px;
+  /* max-width に padding を含める。含めないと、中身が増えたぶんパネルが地図側へ張り出し、
+     そこへのクリックが地図に届かなくなる。 */
+  box-sizing: border-box;
   padding: 14px 16px;
   border-radius: 12px;
   background: rgb(255 255 255 / 0.92);
@@ -264,6 +267,55 @@ li.active .paddy-select {
 }
 
 #library-actions button:disabled {
+  color: #b0b0b5;
+  cursor: default;
+}
+
+#offline {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e5e7;
+}
+
+#offline-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6e6e73;
+}
+
+#offline-status {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #86868b;
+  font-variant-numeric: tabular-nums;
+}
+
+#offline-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+#offline-actions button {
+  /* 既定の min-width では文字の幅ぶんだけ縮まず、パネルが max-width を越えて広がる。
+     広がったパネルは地図を覆い、そこへのクリックが地図に届かなくなる。 */
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+#offline-save {
+  flex: 1;
+}
+
+#offline-actions button:disabled {
   color: #b0b0b5;
   cursor: default;
 }

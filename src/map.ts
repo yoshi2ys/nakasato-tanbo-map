@@ -7,10 +7,15 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import { cachedTileUrl, installTileCache, type TileSource } from './tileCache';
 
 // maplibre-gl は worker を「自分自身の import.meta.url の兄弟ファイル」として実行時に
 // 解決するため、バンドラは worker を出力できない。Vite に出力させた URL を明示的に渡す。
 setWorkerUrl(workerUrl);
+
+// 写真タイルの取得をキャッシュ越しにする。maplibre のモジュール大域への登録なので、
+// 地図 1 枚の生成ではなく、worker の設定と同じ高さに置く。
+installTileCache();
 
 /**
  * 全国の下地。国土地理院「電子国土基本図（オルソ画像）」タイル。API キー不要、出典表記が必須。
@@ -44,6 +49,9 @@ const TOKAMACHI_BOUNDS: [number, number, number, number] = [138.5156, 36.8093, 1
 const TOKAMACHI_ATTRIBUTION =
   '<a href="http://map.city.tokamachi.lg.jp/" target="_blank" rel="noreferrer">十日町市公開地理情報システム 航空写真</a>';
 
+/** どちらの写真タイルも 256px 四方。 */
+const TILE_SIZE = 256;
+
 /** 初期表示位置（十日町）。GeoJSON と同じ順（経度, 緯度）で持つ。 */
 const DEFAULT_CENTER: [lng: number, lat: number] = [138.70184, 37.0525];
 const INITIAL_ZOOM = 17;
@@ -64,6 +72,18 @@ function initialCenter(): [lng: number, lat: number] {
   return usable ? [lng, lat] : DEFAULT_CENTER;
 }
 
+/** 写真タイルの出どころ。オフライン用にためるときも、この定義から URL を数える。 */
+export const TILE_SOURCES: TileSource[] = [
+  { url: GSI_TILE_URL, maxZoom: GSI_MAX_ZOOM, tileSize: TILE_SIZE },
+  {
+    url: TOKAMACHI_TILE_URL,
+    maxZoom: TOKAMACHI_MAX_ZOOM,
+    tileSize: TILE_SIZE,
+    tms: true,
+    bounds: TOKAMACHI_BOUNDS,
+  },
+];
+
 export function createMap(container: HTMLElement): MapLibreMap {
   const map = new MapLibreMap({
     container,
@@ -82,15 +102,15 @@ export function createMap(container: HTMLElement): MapLibreMap {
       sources: {
         gsi: {
           type: 'raster',
-          tiles: [GSI_TILE_URL],
-          tileSize: 256,
+          tiles: [cachedTileUrl(GSI_TILE_URL)],
+          tileSize: TILE_SIZE,
           maxzoom: GSI_MAX_ZOOM,
           attribution: GSI_ATTRIBUTION,
         },
         tokamachi: {
           type: 'raster',
-          tiles: [TOKAMACHI_TILE_URL],
-          tileSize: 256,
+          tiles: [cachedTileUrl(TOKAMACHI_TILE_URL)],
+          tileSize: TILE_SIZE,
           maxzoom: TOKAMACHI_MAX_ZOOM,
           bounds: TOKAMACHI_BOUNDS,
           scheme: 'tms',

@@ -1,5 +1,11 @@
 import { expect, type Page } from '@playwright/test';
 
+/** `TANBO_TEST_STANDALONE=1` のときに開く、単一 HTML の file:// URL。 */
+const standaloneURL =
+  process.env['TANBO_TEST_STANDALONE'] === '1'
+    ? new URL('../dist-standalone/index.html', import.meta.url).href
+    : null;
+
 /** 既定表示（十日町市）で確実に圃場の中心に落ちるシード。view-1x の画から拾った。 */
 export const PADDY_SEEDS: [x: number, y: number][] = [
   [505, 200],
@@ -19,10 +25,21 @@ export const EDIT_HINT_MIN = '頂点をドラッグで移動、中点をクリ�
 
 /** 地図のスタイルが揃い、パネルが操作できるようになるまで待つ。 */
 export async function openApp(page: Page, query = ''): Promise<void> {
-  await page.goto(`/${query}`, { waitUntil: 'networkidle' });
+  await page.goto(standaloneURL === null ? `/${query}` : `${standaloneURL}${query}`, {
+    waitUntil: 'networkidle',
+  });
+  await waitForApp(page);
+}
+
+/**
+ * パネルが操作できるようになり、タイルが出そろうまで待つ。
+ *
+ * 開き直したあとにも要るので、`openApp` と分けてある。自動検出は表示中の画像を読むため、
+ * 用意ができた合図だけでは足りず、描画が落ち着くまで少し待つ。
+ */
+export async function waitForApp(page: Page, settleMs = 2000): Promise<void> {
   await expect(page.locator('#mode input[value="auto"]')).toBeEnabled({ timeout: 60_000 });
-  // タイルが出そろってから測る。自動検出は表示中の画像を読むため。
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(settleMs);
 }
 
 export async function clickMap(page: Page, x: number, y: number): Promise<void> {
@@ -94,6 +111,42 @@ export async function paddyRows(
       active: li.classList.contains('active'),
     }))
   );
+}
+
+/** 画素を数えるときの見方。編集中の色（#00b0ff）か、何か描かれているか。 */
+type PixelKind = 'drawn' | 'covered';
+
+/**
+ * 地図の canvas の画素を数える。
+ *
+ * 面積は出ているのに地図には何も出ない、という壊れ方があるので、数値ではなく画を見る。
+ * `drawn` は編集中の色に一致した画素数。航空写真にも青い屋根が写るため、絶対数ではなく
+ * 描く前後の差で判断する。`covered` は何か描かれている画素の割合（0〜1）で、写真タイルが
+ * 出ていれば地図はほぼ埋まり、出ていなければ透明のまま残る。
+ */
+export async function mapPixels(page: Page, kind: PixelKind): Promise<number> {
+  return page.evaluate((target: PixelKind) => {
+    const canvas = document.querySelector<HTMLCanvasElement>('#map canvas');
+    if (canvas === null) throw new Error('地図の canvas が見つかりません');
+    const copy = document.createElement('canvas');
+    copy.width = canvas.width;
+    copy.height = canvas.height;
+    const context = copy.getContext('2d');
+    if (context === null) throw new Error('2D コンテキストを作れません');
+    context.drawImage(canvas, 0, 0);
+    const { data } = context.getImageData(0, 0, copy.width, copy.height);
+
+    let matched = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const [red, green, blue, alpha] = [data[i] ?? 0, data[i + 1] ?? 0, data[i + 2] ?? 0, data[i + 3] ?? 0];
+      const hit =
+        target === 'drawn'
+          ? red < 70 && green > 140 && green < 205 && blue > 215
+          : alpha > 10;
+      if (hit) matched += 1;
+    }
+    return target === 'covered' ? matched / (copy.width * copy.height) : matched;
+  }, kind);
 }
 
 /** console と pageerror を集める。テストの最後に空であることを確かめる。 */

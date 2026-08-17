@@ -8,7 +8,7 @@ import {
   loadOpenCV,
   waitForIdle,
 } from './detect';
-import { createMap } from './map';
+import { TILE_SOURCES, createMap } from './map';
 import { MeasureTool, type MeasureState } from './measure';
 import {
   ImportError,
@@ -23,6 +23,13 @@ import {
   type Paddy,
 } from './paddies';
 import { SavedPaddyLayer } from './paddyLayer';
+import {
+  SAVE_TILE_LIMIT,
+  cacheStats,
+  clearTiles,
+  saveTiles,
+  tileUrlsForView,
+} from './tileCache';
 import { formatArea, formatDistance } from './units';
 
 function element<T extends HTMLElement>(id: string): T {
@@ -45,6 +52,9 @@ const importButton = element<HTMLButtonElement>('import');
 const importFile = element<HTMLInputElement>('import-file');
 const measureList = element('measure');
 const measureTotal = element('measure-total');
+const offlineStatus = element('offline-status');
+const offlineSaveButton = element<HTMLButtonElement>('offline-save');
+const offlineClearButton = element<HTMLButtonElement>('offline-clear');
 
 /** 自動検出の進行状況。ヒント欄を占有するので、描画の状態より優先して出す。 */
 type Detection = { status: 'idle' } | { status: 'running' } | { status: 'failed'; message: string };
@@ -127,6 +137,101 @@ window.addEventListener('pagehide', () => {
 });
 
 const map = createMap(element('map'));
+
+/** タイルを保存しているあいだだけ持つ。中止に使う。 */
+let tileSaving: AbortController | null = null;
+
+function formatBytes(bytes: number): string {
+  const megabytes = bytes / 1024 / 1024;
+  return megabytes >= 1 ? `${megabytes.toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+}
+
+/** 直前の操作の結果。地図を動かすたびに消えると、何が起きたか読めなくなる。 */
+let offlineMessage: string | null = null;
+
+/** 直前の操作の結果を差し替えて出し直す。null なら数字だけに戻す。 */
+async function setOfflineMessage(message: string | null): Promise<void> {
+  offlineMessage = message;
+  await refreshOfflineStatus();
+}
+
+async function refreshOfflineStatus(): Promise<void> {
+  const { count, bytes } = await cacheStats();
+  const stored =
+    count === 0 ? 'まだ保存していません' : `${count.toLocaleString()} 枚・${formatBytes(bytes)}`;
+  offlineStatus.textContent = offlineMessage === null ? stored : `${offlineMessage}（${stored}）`;
+  // 保存中も押せる（そのときは「中止」として働く）。
+  offlineSaveButton.disabled = false;
+  offlineClearButton.disabled = count === 0 || tileSaving !== null;
+}
+
+async function saveVisibleArea(): Promise<void> {
+  const bounds = map.getBounds();
+  const urls = tileUrlsForView(
+    TILE_SOURCES,
+    [bounds.getWest(), bounds.getSouth(), bounds.getEast(), bounds.getNorth()],
+    map.getZoom()
+  );
+
+  if (urls.length > SAVE_TILE_LIMIT) {
+    offlineStatus.textContent = `範囲が広すぎます（${urls.length.toLocaleString()} 枚）。ズームを上げてから保存してください`;
+    return;
+  }
+  if (!confirm(`表示中の範囲の写真 ${urls.length.toLocaleString()} 枚を保存しますか？`)) return;
+
+  tileSaving = new AbortController();
+  offlineSaveButton.textContent = '中止';
+  offlineClearButton.disabled = true;
+  const { failed, notStored } = await saveTiles(
+    urls,
+    (done, total) => {
+      offlineStatus.textContent = `保存中… ${done.toLocaleString()} / ${total.toLocaleString()}`;
+    },
+    tileSaving.signal
+  );
+
+  const stopped = tileSaving.signal.aborted;
+  tileSaving = null;
+  offlineSaveButton.textContent = 'この範囲を保存';
+  await setOfflineMessage(saveMessage(stopped, failed, notStored));
+}
+
+/**
+ * 保存の結果。「保存しました」とだけ出して現地で写真が出ない、が一番まずいので、
+ * 取れなかった分もためられなかった分もそのまま出す。
+ */
+function saveMessage(stopped: boolean, failed: number, notStored: number): string {
+  if (stopped) return '中止しました';
+  // 保存領域が一杯か、ブラウザが IndexedDB を使わせない。取れていても現地では出ない。
+  if (notStored > 0) return `${notStored.toLocaleString()} 枚を保存できませんでした`;
+  // 市域外では十日町市のタイルが 404 になる。地理院タイルがあるので地図自体は出る。
+  if (failed > 0) return `保存しました。${failed.toLocaleString()} 枚は取れませんでした`;
+  return '保存しました';
+}
+
+offlineSaveButton.addEventListener('click', () => {
+  if (tileSaving !== null) {
+    tileSaving.abort();
+    return;
+  }
+  void saveVisibleArea();
+});
+
+offlineClearButton.addEventListener('click', () => {
+  if (!confirm('保存した写真を消しますか？')) return;
+  void (async () => {
+    const cleared = await clearTiles();
+    // 消したあとは、直前の「保存しました」を引きずらない。
+    await setOfflineMessage(cleared ? null : '消せませんでした');
+  })();
+});
+
+// 見ているだけでもタイルはたまる。地図が落ち着くたびに、たまった量を出し直す。
+map.on('idle', () => {
+  if (tileSaving === null) void refreshOfflineStatus();
+});
+
+void refreshOfflineStatus();
 
 // タイルの読み込みではなくスタイルの用意ができた時点で始める。
 // 写真タイルが落ちてもアプリが起動しないという状態を作らないため。

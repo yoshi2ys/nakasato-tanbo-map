@@ -38,6 +38,15 @@
           <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
         </div>
       </section>
+
+      <section id="offline">
+        <h2 id="offline-heading">オフライン用の地図</h2>
+        <p id="offline-status">確認中…</p>
+        <div id="offline-actions">
+          <button id="offline-save" type="button" disabled>この範囲を保存</button>
+          <button id="offline-clear" type="button" disabled>消す</button>
+        </div>
+      </section>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
