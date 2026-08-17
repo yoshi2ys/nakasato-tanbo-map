@@ -1,5 +1,5 @@
 import { devices, expect, test, type Page } from '@playwright/test';
-import { collectErrors, itemRows, openApp } from './helpers';
+import { collectErrors, itemRows, openApp, openSettings } from './helpers';
 
 /**
  * 電話で開いたときの画面。
@@ -73,6 +73,14 @@ test.describe('電話で使う', () => {
     expect((await page.locator('#sidebar').boundingBox())!.y).toBeGreaterThan(shown);
   });
 
+  test('設定は地図の上のボタンから開ける', async ({ page }) => {
+    // 一覧を開かないと設定に入れない、では文字を大きくしたい人に遠すぎる。
+    await expect(page.locator('#settings-open-map')).toBeVisible();
+    await openSettings(page);
+    await expect(page.locator('#settings')).toBeVisible();
+    await expect(page.locator('#text-ui-medium')).toBeChecked();
+  });
+
   test('道具は記号と名前の両方を出す', async ({ page }) => {
     await page.locator('#mode label:has(input[value="edit"])').tap();
     await page.waitForTimeout(300);
@@ -87,7 +95,7 @@ test.describe('電話で使う', () => {
     await page.waitForTimeout(300);
 
     for (const [x, y] of TRIANGLE) await tapMap(page, x, y);
-    await page.keyboard.press('Enter');
+    await page.locator('#finish-draw').tap();
     await page.waitForTimeout(500);
 
     const rows = await itemRows(page);
@@ -101,11 +109,100 @@ test.describe('電話で使う', () => {
     await expect(page.locator('#inspector-body')).toBeVisible();
   });
 
+  test('指だけで計測を終えられる', async ({ page }) => {
+    // ダブルタップも Enter も使えない。確定はボタンで受ける。
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.locator('#tools label:has(input[value="measure"])').tap();
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('#finish-draw')).toBeHidden();
+    await tapMap(page, 110, 320);
+    // 1 点では終われないので、まだ出さない。
+    await expect(page.locator('#finish-draw')).toBeHidden();
+
+    await tapMap(page, 280, 320);
+    await expect(page.locator('#finish-draw')).toBeVisible();
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(400);
+
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.kind).toBe('measure');
+    await expect(page.locator('#finish-draw')).toBeHidden();
+  });
+
+  test('指だけで田んぼを閉じられる', async ({ page }) => {
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.waitForTimeout(300);
+
+    for (const [x, y] of TRIANGLE) await tapMap(page, x, y);
+    await expect(page.locator('#finish-draw')).toBeVisible();
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(400);
+
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.kind).toBe('paddy');
+  });
+
+  test('指だけで描きかけをやめられる', async ({ page }) => {
+    // Esc が押せないので、取りやめもボタンで受ける。
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('#discard-draw')).toBeHidden();
+    await tapMap(page, 110, 300);
+    await expect(page.locator('#discard-draw')).toBeVisible();
+
+    await page.locator('#discard-draw').tap();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#discard-draw')).toBeHidden();
+    expect(await itemRows(page)).toHaveLength(0);
+  });
+
+  test('指だけで頂点を削除できる', async ({ page }) => {
+    // 右クリックも Delete も使えないので、選んでからボタンで消す。
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.waitForTimeout(300);
+    for (const [x, y] of [...TRIANGLE, [110, 430] as [number, number]]) await tapMap(page, x, y);
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(400);
+
+    // 頂点を選ぶまではボタンを出さない。
+    await expect(page.locator('#delete-vertex')).toBeHidden();
+    await tapMap(page, 110, 300);
+    await expect(page.locator('#delete-vertex')).toBeVisible();
+
+    const before = (await itemRows(page))[0]?.value;
+    await page.locator('#delete-vertex').tap();
+    await page.waitForTimeout(400);
+
+    expect((await itemRows(page))[0]?.value).not.toBe(before);
+    // 3 頂点まで減ったら、それ以上は消せないのでボタンも消える。
+    await expect(page.locator('#delete-vertex')).toBeHidden();
+  });
+
+  test('計測の点も指で動かせる', async ({ page }) => {
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.locator('#tools label:has(input[value="measure"])').tap();
+    await page.waitForTimeout(300);
+
+    await tapMap(page, 110, 320);
+    await tapMap(page, 280, 320);
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(400);
+
+    const before = (await itemRows(page))[0]?.value;
+    await touchDrag(page, [280, 320], [280, 460]);
+
+    expect((await itemRows(page))[0]?.value).not.toBe(before);
+  });
+
   test('指で頂点を動かせる', async ({ page }) => {
     await page.locator('#mode label:has(input[value="edit"])').tap();
     await page.waitForTimeout(300);
     for (const [x, y] of TRIANGLE) await tapMap(page, x, y);
-    await page.keyboard.press('Enter');
+    await page.locator('#finish-draw').tap();
     await page.waitForTimeout(400);
 
     const before = (await itemRows(page))[0]?.value;

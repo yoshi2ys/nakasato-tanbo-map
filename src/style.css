@@ -1,10 +1,19 @@
+/*
+ * 文字の大きさは設定で変えられる。畑では日差しも姿勢も一定でないので、
+ * 画面まわり（--ui-scale）と地図に出る文字（--label-scale）を別々に持つ。
+ */
+:root {
+  --ui-scale: 1;
+  --label-scale: 1;
+}
+
 html,
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale));
   color: #1d1d1f;
   background: #f5f5f7;
 }
@@ -52,7 +61,7 @@ button {
 
 #sidebar-header h1 {
   margin: 0;
-  font-size: 14px;
+  font-size: calc(14px * var(--ui-scale));
   font-weight: 600;
 }
 
@@ -140,7 +149,7 @@ li.selected .item-name {
 .item-value {
   flex: none;
   color: #6e6e73;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   font-variant-numeric: tabular-nums;
 }
 
@@ -169,7 +178,7 @@ li.selected .item-name {
 
 #items-empty {
   margin: 8px 2px;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   line-height: 1.6;
   color: #86868b;
 }
@@ -187,7 +196,7 @@ li.selected .item-name {
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   background: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   cursor: pointer;
 }
 
@@ -247,7 +256,7 @@ li.selected .item-name {
 #mode label {
   padding: 5px 12px;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   white-space: nowrap;
   cursor: pointer;
 }
@@ -261,7 +270,7 @@ li.selected .item-name {
   min-width: 60px;
   padding: 5px 8px 4px;
   border-radius: 7px;
-  font-size: 10px;
+  font-size: calc(10px * var(--ui-scale));
   line-height: 1.3;
   white-space: nowrap;
   cursor: pointer;
@@ -304,6 +313,51 @@ li.selected .item-name {
   pointer-events: none;
 }
 
+/*
+ * 描いている最中の操作。キーボードのない端末では、これが唯一の手段になる。
+ * 案内の下、指の届く高さに並べる。
+ */
+#draw-actions {
+  position: absolute;
+  bottom: 68px;
+  left: 50%;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+  transform: translateX(-50%);
+}
+
+#draw-actions[hidden],
+#draw-actions button[hidden] {
+  display: none;
+}
+
+#draw-actions button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.94);
+  backdrop-filter: blur(20px);
+  color: #1d1d1f;
+  font-size: calc(13px * var(--ui-scale));
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+
+#finish-draw {
+  background: #0071e3;
+  color: #fff;
+}
+
+#delete-vertex {
+  color: #c8102e;
+}
+
 #hint {
   position: absolute;
   bottom: 30px;
@@ -316,10 +370,14 @@ li.selected .item-name {
   border-radius: 999px;
   background: rgb(29 29 31 / 0.78);
   color: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   line-height: 1.5;
   text-align: center;
   pointer-events: none;
+}
+
+#app:has(#draw-actions:not([hidden])) #hint {
+  bottom: 112px;
 }
 
 #hint.warning {
@@ -332,7 +390,7 @@ li.selected .item-name {
   border-radius: 6px;
   background: rgb(29 29 31 / 0.78);
   color: #fff;
-  font-size: 11px;
+  font-size: calc(11px * var(--label-scale));
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
@@ -374,7 +432,7 @@ li.selected .item-name {
 
 #inspector-empty {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   line-height: 1.6;
   color: #86868b;
 }
@@ -400,7 +458,7 @@ li.selected .item-name {
 
 #inspector-header h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale));
   font-weight: 600;
 }
 
@@ -411,7 +469,7 @@ li.selected .item-name {
 }
 
 .field > span {
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   color: #6e6e73;
 }
 
@@ -426,7 +484,7 @@ li.selected .item-name {
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale));
 }
 
 #inspector-colors {
@@ -494,11 +552,32 @@ li.selected .item-name {
 
 #area,
 #measure {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 2px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+
+/* 数値と単位で 1 つのまとまり。読むときに目が往復しないよう、間を空けない。 */
+.metric {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin: 0;
+  font-size: calc(15px * var(--ui-scale));
+}
+
+.metric.primary {
+  font-size: calc(26px * var(--ui-scale));
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.metric .unit {
+  color: #6e6e73;
+  font-size: 0.62em;
+  font-weight: 400;
 }
 
 /* display 指定は hidden 属性より強いので、明示的に打ち消す。 */
@@ -513,28 +592,9 @@ li.selected .item-name {
   opacity: 0.4;
 }
 
-#area dt,
-#measure dt {
-  font-size: 12px;
-  color: #6e6e73;
-}
-
-#area dd,
-#measure dd {
-  margin: 0;
-  font-size: 15px;
-  text-align: right;
-}
-
-#area dd:first-of-type,
-#measure dd {
-  font-size: 19px;
-  font-weight: 600;
-}
-
 #inspector-position {
   margin: 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   color: #6e6e73;
   font-variant-numeric: tabular-nums;
 }
@@ -551,7 +611,7 @@ li.selected .item-name {
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   background: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   cursor: pointer;
 }
 
@@ -600,13 +660,13 @@ li.selected .item-name {
 
 #settings-header h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: calc(15px * var(--ui-scale));
   font-weight: 600;
 }
 
 #settings section h3 {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   font-weight: 600;
   color: #6e6e73;
 }
@@ -633,7 +693,7 @@ li.selected .item-name {
 
 #offline-status {
   margin: 0 0 8px;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   color: #6e6e73;
   font-variant-numeric: tabular-nums;
 }
@@ -649,7 +709,7 @@ li.selected .item-name {
   border: 1px solid #d2d2d7;
   border-radius: 8px;
   background: #fff;
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale));
   cursor: pointer;
 }
 
@@ -664,7 +724,7 @@ li.selected .item-name {
 
 .note {
   margin: 8px 0 0;
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale));
   line-height: 1.6;
   color: #86868b;
 }
@@ -693,7 +753,8 @@ li.selected .item-name {
 }
 
 #list-open,
-#list-close {
+#list-close,
+#settings-open-map {
   display: none;
 }
 
@@ -741,7 +802,8 @@ li.selected .item-name {
     display: none;
   }
 
-  #list-open {
+  #list-open,
+  #settings-open-map {
     position: absolute;
     right: 12px;
     bottom: max(40px, calc(env(safe-area-inset-bottom) + 34px));
@@ -761,7 +823,12 @@ li.selected .item-name {
     cursor: pointer;
   }
 
-  #app.list-open #list-open {
+  #settings-open-map {
+    bottom: max(92px, calc(env(safe-area-inset-bottom) + 86px));
+  }
+
+  #app.list-open #list-open,
+  #app.list-open #settings-open-map {
     display: none;
   }
 
@@ -799,12 +866,35 @@ li.selected .item-name {
   /* ヒントはシートに隠れないよう、地図の下端から離して置く。 */
   #hint {
     bottom: max(70px, calc(env(safe-area-inset-bottom) + 60px));
-    font-size: 11px;
+    font-size: calc(11px * var(--ui-scale));
   }
 
   #app.has-selection #hint,
   #app.list-open #hint {
     display: none;
+  }
+
+  /* 指の届くところに置く。案内はその上に逃がす。 */
+  #draw-actions {
+    bottom: max(72px, calc(env(safe-area-inset-bottom) + 62px));
+  }
+
+  #draw-actions button {
+    padding: 12px 18px;
+    font-size: calc(14px * var(--ui-scale));
+  }
+
+  #app:has(#draw-actions:not([hidden])) #hint {
+    bottom: max(130px, calc(env(safe-area-inset-bottom) + 120px));
+  }
+
+  #app.list-open #draw-actions {
+    display: none;
+  }
+
+  /* インスペクタのシートが出ているあいだは、その上へ逃がす。隠れると押せない。 */
+  #app.has-selection #draw-actions {
+    bottom: calc(62% + 12px);
   }
 
   /* 指で押す前提の寸法。一覧の行と、色やアイコンの選択肢を広げる。 */
@@ -843,4 +933,47 @@ li.selected .item-name {
   #settings {
     align-items: flex-end;
   }
+
+  /* 出典は 1 行に収める。正式な名前は設定画面の「出典」で読める。 */
+  .maplibregl-ctrl-attrib {
+    font-size: calc(10px * var(--ui-scale));
+  }
+}
+
+/* 文字の大きさの選択。設定シートの中に置く。 */
+.scale-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.scale-choices {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f0f0f2;
+}
+
+.scale-choices label {
+  min-width: 40px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: calc(12px * var(--ui-scale));
+  text-align: center;
+  cursor: pointer;
+}
+
+.scale-choices label:has(:checked) {
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+.scale-choices input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }

@@ -1,10 +1,19 @@
 import { OVERLAYS } from '../overlays';
-import type { Settings } from '../settings';
+import { TEXT_SCALES, type Settings, type TextScale } from '../settings';
 import { element, setIcon } from './dom';
 
 export interface SettingsCallbacks {
   onOverlayChange: (settings: Settings) => void;
+  onTextScaleChange: (settings: Settings) => void;
 }
+
+const SCALE_LABEL: Record<TextScale, string> = { small: '小', medium: '中', large: '大' };
+
+/** どの文字を変えるか。画面まわりと、地図に出る文字を分けて選べる。 */
+const SCALE_ROWS: { key: 'uiScale' | 'labelScale'; label: string; id: string }[] = [
+  { key: 'uiScale', label: '画面の文字', id: 'ui' },
+  { key: 'labelScale', label: '地図の文字', id: 'label' },
+];
 
 /**
  * 設定のシート。重ねる地図の切り替えと濃さ、オフライン用に落とした地図の量と削除。
@@ -12,8 +21,11 @@ export interface SettingsCallbacks {
 export class SettingsSheet {
   readonly #root = element('settings');
   readonly #openButton = element<HTMLButtonElement>('settings-open');
+  /** 狭い画面のときだけ地図の上に出るほう。左の列が引っ込んでいても設定に入れる。 */
+  readonly #openOnMapButton = element<HTMLButtonElement>('settings-open-map');
   readonly #closeButton = element<HTMLButtonElement>('settings-close');
   readonly #list = element('overlay-list');
+  readonly #textScales = element('text-scales');
   readonly #callbacks: SettingsCallbacks;
   #settings: Settings;
 
@@ -24,6 +36,7 @@ export class SettingsSheet {
     setIcon(this.#closeButton, 'close');
 
     this.#openButton.addEventListener('click', () => this.open());
+    this.#openOnMapButton.addEventListener('click', () => this.open());
     this.#closeButton.addEventListener('click', () => this.close());
     // 背景を押したら閉じる。シートの内側は素通しにする。
     this.#root.addEventListener('click', (event) => {
@@ -34,6 +47,7 @@ export class SettingsSheet {
     });
 
     this.#build();
+    this.#buildTextScales();
   }
 
   open(): void {
@@ -42,6 +56,45 @@ export class SettingsSheet {
 
   close(): void {
     this.#root.hidden = true;
+  }
+
+  #buildTextScales(): void {
+    this.#textScales.replaceChildren(
+      ...SCALE_ROWS.map((row) => {
+        const line = document.createElement('div');
+        line.className = 'scale-row';
+
+        const name = document.createElement('span');
+        name.textContent = row.label;
+
+        const choices = document.createElement('div');
+        choices.className = 'scale-choices';
+        choices.setAttribute('role', 'radiogroup');
+        choices.setAttribute('aria-label', row.label);
+
+        for (const scale of TEXT_SCALES) {
+          const label = document.createElement('label');
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = `text-${row.id}`;
+          input.value = scale;
+          input.id = `text-${row.id}-${scale}`;
+          input.checked = this.#settings[row.key] === scale;
+          input.addEventListener('change', () => {
+            if (!input.checked) return;
+            this.#settings[row.key] = scale;
+            this.#callbacks.onTextScaleChange(this.#settings);
+          });
+          const text = document.createElement('span');
+          text.textContent = SCALE_LABEL[scale];
+          label.append(input, text);
+          choices.append(label);
+        }
+
+        line.append(name, choices);
+        return line;
+      })
+    );
   }
 
   #build(): void {

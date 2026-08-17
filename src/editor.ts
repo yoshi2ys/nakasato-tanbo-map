@@ -60,6 +60,8 @@ export interface EditState {
   kind: EditKind;
   phase: EditPhase;
   vertexCount: number;
+  /** 選んでいる頂点の番号。削除の対象になる。 */
+  selectedVertex: number | null;
   /** polygon のときの面積（㎡）。閉合前は暫定値。 */
   areaSquareMeters: number | null;
   /** line のときの全長（m）。 */
@@ -240,6 +242,32 @@ export class ItemEditor {
     }
     this.#commitVertices();
   };
+
+  /**
+   * 頂点が足りていれば確定する。
+   * ダブルクリックや Enter が使えない環境のために、外からも呼べるようにしてある。
+   */
+  finish(): void {
+    this.#close();
+  }
+
+  /**
+   * 描きかけを捨てる。Esc と同じ働きで、キーボードのない端末のために外から呼べる。
+   */
+  discard(): void {
+    this.begin(this.#kind, this.#color);
+  }
+
+  /** 選んでいる頂点を消す。右クリックや Delete の代わりに、ボタンからも呼べる。 */
+  deleteSelectedVertex(): void {
+    if (this.#selected === null) return;
+    this.#deleteVertex(this.#selected);
+  }
+
+  /** いま確定できるか。確定のボタンを出すかどうかの判断に使う。 */
+  get canFinish(): boolean {
+    return this.#phase === 'drawing' && this.#canClose();
+  }
 
   /** 頂点が足りていれば確定して編集に移る。 */
   #close(): void {
@@ -528,6 +556,7 @@ export class ItemEditor {
       kind: this.#kind,
       phase: this.#phase,
       vertexCount: this.#vertices.length,
+      selectedVertex: this.#selected,
       areaSquareMeters: this.#areaSquareMeters,
       totalMeters: this.#totalMeters,
       canDeleteVertex: this.#canDeleteVertex(),

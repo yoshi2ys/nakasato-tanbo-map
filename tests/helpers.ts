@@ -144,10 +144,12 @@ export async function toggleRowVisible(page: Page, index: number): Promise<void>
   await page.waitForTimeout(250);
 }
 
-/** 設定のシートを開く。 */
+/** 設定のシートを開く。狭い画面では地図の上のボタン、広い画面では一覧の上のボタン。 */
 export async function openSettings(page: Page): Promise<void> {
-  await page.locator('#settings-open').click();
-  await page.waitForTimeout(200);
+  const onMap = page.locator('#settings-open-map');
+  const button = (await onMap.isVisible()) ? onMap : page.locator('#settings-open');
+  await button.click();
+  await page.waitForTimeout(250);
 }
 
 /** 画素を数えるときの見方。田んぼの既定色（#ffb300）か、何か描かれているか。 */

@@ -73,7 +73,7 @@ test.describe('手動でポリゴンを描く', () => {
 
   test('3 頂点に満たないうちは面積を出さない', async ({ page }) => {
     await clickMap(page, 500, 300);
-    await expect(hint(page)).toHaveText('クリックで頂点を追加（Esc で最初からやり直す）');
+    await expect(hint(page)).toHaveText('頂点を追加（「やめる」で最初からやり直す）');
     await expect(page.locator('#area')).toBeHidden();
 
     await clickMap(page, 600, 300);
@@ -87,7 +87,7 @@ test.describe('手動でポリゴンを描く', () => {
 
     // 重複頂点ができていれば 3 頂点扱いになり、面積 0 付近が出てしまう。
     await expect(page.locator('#area')).toBeHidden();
-    await expect(hint(page)).toHaveText('クリックで頂点を追加（Esc で最初からやり直す）');
+    await expect(hint(page)).toHaveText('頂点を追加（「やめる」で最初からやり直す）');
   });
 
   test('3 頂点目から暫定の面積を出す', async ({ page }) => {
@@ -96,7 +96,7 @@ test.describe('手動でポリゴンを描く', () => {
     await clickMap(page, 600, 400);
     await clickMap(page, 500, 400);
 
-    await expect(hint(page)).toHaveText('開始点をクリック / ダブルクリック / Enter で閉じる');
+    await expect(hint(page)).toHaveText('「確定」か、開始点をタップして閉じる');
     await expect(page.locator('#area-square-meters')).toHaveText(SQUARE_100PX);
   });
 
@@ -128,6 +128,23 @@ test.describe('手動でポリゴンを描く', () => {
 
     await expect(hint(page)).toHaveText(EDIT_HINT_MIN);
     await expect(page.locator('#area-square-meters')).toHaveText(TRIANGLE_100PX);
+  });
+
+  test('「確定」ボタンで閉じる', async ({ page }) => {
+    await expect(page.locator('#finish-draw')).toBeHidden();
+    await clickMap(page, 300, 500);
+    await clickMap(page, 400, 500);
+    // 3 頂点に満たないうちは閉じられないので、ボタンも出さない。
+    await expect(page.locator('#finish-draw')).toBeHidden();
+
+    await clickMap(page, 350, 600);
+    await expect(page.locator('#finish-draw')).toBeVisible();
+    await page.locator('#finish-draw').click();
+    await page.waitForTimeout(250);
+
+    await expect(hint(page)).toHaveText(EDIT_HINT_MIN);
+    await expect(page.locator('#area-square-meters')).toHaveText(TRIANGLE_100PX);
+    await expect(page.locator('#finish-draw')).toBeHidden();
   });
 
   test('ダブルクリックで閉じる', async ({ page }) => {

@@ -12,8 +12,24 @@ export interface OverlaySetting {
   opacity: number;
 }
 
+/** 文字の大きさ。畑では明るさも姿勢も一定でないので、その場で選べるようにする。 */
+export type TextScale = 'small' | 'medium' | 'large';
+
+export const TEXT_SCALES: TextScale[] = ['small', 'medium', 'large'];
+
+/** 既定に対する倍率。 */
+export const TEXT_SCALE_FACTOR: Record<TextScale, number> = {
+  small: 0.88,
+  medium: 1,
+  large: 1.25,
+};
+
 export interface Settings {
   overlays: Record<OverlayId, OverlaySetting>;
+  /** 画面まわりの文字。 */
+  uiScale: TextScale;
+  /** 地図に出る文字（計測の長さなど）。 */
+  labelScale: TextScale;
 }
 
 const DEFAULT_OPACITY: Record<OverlayId, number> = {
@@ -23,14 +39,25 @@ const DEFAULT_OPACITY: Record<OverlayId, number> = {
 };
 
 export function defaultSettings(): Settings {
-  return build(() => undefined);
+  return build(() => undefined, {});
+}
+
+function readScale(value: unknown): TextScale {
+  return TEXT_SCALES.includes(value as TextScale) ? (value as TextScale) : 'medium';
 }
 
 /** 保存されている値（無ければ既定）から組み立てる。 */
-function build(read: (id: OverlayId) => unknown): Settings {
+function build(
+  read: (id: OverlayId) => unknown,
+  stored: { uiScale?: unknown; labelScale?: unknown }
+): Settings {
   const overlays = {} as Record<OverlayId, OverlaySetting>;
   for (const id of OVERLAY_IDS) overlays[id] = readOverlay(read(id), id);
-  return { overlays };
+  return {
+    overlays,
+    uiScale: readScale(stored.uiScale),
+    labelScale: readScale(stored.labelScale),
+  };
 }
 
 function readOverlay(value: unknown, id: OverlayId): OverlaySetting {
@@ -51,8 +78,12 @@ export function loadSettings(): Settings {
   if (text === null) return defaultSettings();
 
   try {
-    const parsed = JSON.parse(text) as { overlays?: Record<string, unknown> };
-    return build((id) => parsed?.overlays?.[id]);
+    const parsed = JSON.parse(text) as {
+      overlays?: Record<string, unknown>;
+      uiScale?: unknown;
+      labelScale?: unknown;
+    };
+    return build((id) => parsed?.overlays?.[id], parsed ?? {});
   } catch {
     // 壊れた設定で起動できなくなるより、既定で始めるほうがまし。
     return defaultSettings();

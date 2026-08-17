@@ -8,8 +8,8 @@ import type { EditState } from './editor';
  */
 
 export const EDIT_HINT =
-  '頂点をドラッグで移動、中点をクリックで追加。削除は右クリック、または選択して Delete';
-export const EDIT_HINT_MIN = '頂点をドラッグで移動、中点をクリックで追加（これ以上は減らせません）';
+  '頂点をドラッグで移動、中点で追加。選んで「頂点を削除」（右クリックでも消せます）';
+export const EDIT_HINT_MIN = '頂点をドラッグで移動、中点で追加（これ以上は減らせません）';
 
 export type AppMode = 'view' | 'edit';
 export type Tool = 'manual' | 'auto' | 'measure' | 'pin';
@@ -36,8 +36,8 @@ function editingHint(edit: EditState): string {
 function manualHint(edit: EditState): string {
   if (edit.selfIntersecting) return '輪郭が交差しています。この面積は当てになりません';
   if (edit.phase === 'editing') return editingHint(edit);
-  if (edit.vertexCount >= 3) return '開始点をクリック / ダブルクリック / Enter で閉じる';
-  if (edit.vertexCount >= 1) return 'クリックで頂点を追加（Esc で最初からやり直す）';
+  if (edit.vertexCount >= 3) return '「確定」か、開始点をタップして閉じる';
+  if (edit.vertexCount >= 1) return '頂点を追加（「やめる」で最初からやり直す）';
   return 'クリックで頂点を追加';
 }
 
@@ -45,8 +45,8 @@ function measureHint(edit: EditState): string {
   if (edit.phase === 'editing') return editingHint(edit);
   if (edit.vertexCount === 0) return 'クリックした点から点までの距離を測ります';
   // 1 点だけでは Enter もダブルクリックも効かない。効かない操作を案内しない。
-  if (edit.vertexCount === 1) return 'もう 1 点クリックすると距離が出ます（Esc で消去）';
-  return 'クリックで点を継ぎ足し、ダブルクリック / Enter で終了（Esc で消去）';
+  if (edit.vertexCount === 1) return 'もう 1 点で距離が出ます（「やめる」で消去）';
+  return '点を継ぎ足して、「確定」で終了（「やめる」で消去）';
 }
 
 export function hintText(input: HintInput): string {

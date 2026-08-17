@@ -28,8 +28,12 @@
       <div id="stage">
         <div id="map"></div>
 
-        <!-- 画面が狭いとき、一覧はここから開く。広いときは左に出ているので出さない。 -->
+        <!--
+          画面が狭いとき、一覧と設定はここから開く。
+          広いときは左の列に出ているので、こちらは出さない。
+        -->
         <button id="list-open" type="button" aria-label="一覧"></button>
+        <button id="settings-open-map" type="button" aria-label="設定"></button>
 
         <div id="topbar">
           <div id="mode" role="radiogroup" aria-label="モード">
@@ -45,6 +49,16 @@
               <label data-icon="location_on"><input type="radio" name="tool" value="pin" /><span>ピン</span></label>
             </div>
           </div>
+        </div>
+
+        <!--
+          指ではダブルタップも Enter も Esc も右クリックも使えない。
+          確定・取りやめ・頂点の削除は、いずれもボタンで受ける。
+        -->
+        <div id="draw-actions" hidden>
+          <button id="discard-draw" type="button" hidden><span>やめる</span></button>
+          <button id="delete-vertex" type="button" hidden><span>頂点を削除</span></button>
+          <button id="finish-draw" type="button" hidden><span>確定</span></button>
         </div>
 
         <p id="hint">読み込み中…</p>
@@ -78,19 +92,16 @@
           <div id="inspector-icons"></div>
         </div>
 
-        <dl id="area" hidden>
-          <dt>㎡</dt>
-          <dd id="area-square-meters"></dd>
-          <dt>反</dt>
-          <dd id="area-tan"></dd>
-          <dt>畝</dt>
-          <dd id="area-se"></dd>
-        </dl>
+        <!-- 数値と単位は必ず隣り合わせにする。離すと目で結び付けられない。 -->
+        <div id="area" hidden>
+          <p class="metric primary"><span id="area-square-meters"></span><span class="unit">㎡</span></p>
+          <p class="metric"><span id="area-tan"></span><span class="unit">反</span></p>
+          <p class="metric"><span id="area-se"></span><span class="unit">畝</span></p>
+        </div>
 
-        <dl id="measure" hidden>
-          <dt>合計</dt>
-          <dd id="measure-total"></dd>
-        </dl>
+        <div id="measure" hidden>
+          <p class="metric primary"><span id="measure-total"></span></p>
+        </div>
 
         <p id="inspector-position" hidden></p>
 
@@ -108,6 +119,11 @@
           <h2 id="settings-heading">設定</h2>
           <button id="settings-close" type="button" aria-label="閉じる"></button>
         </header>
+
+        <section>
+          <h3>文字の大きさ</h3>
+          <div id="text-scales"></div>
+        </section>
 
         <section>
           <h3>重ねる地図</h3>

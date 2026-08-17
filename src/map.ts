@@ -27,8 +27,9 @@ installTileCache();
  */
 const GSI_TILE_URL = 'https://cyberjapandata.gsi.go.jp/xyz/ort/{z}/{x}/{y}.jpg';
 const GSI_MAX_ZOOM = 18;
+/** 地図の隅に出す短い表記。正式な名前は設定画面の「出典」に書いてある。 */
 const GSI_ATTRIBUTION =
-  '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">国土地理院 電子国土基本図（オルソ画像）</a>';
+  '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noreferrer">地理院タイル</a>';
 
 /**
  * 十日町市公開地理情報システムの航空写真（2022 年撮影）。市域だけを覆う。
@@ -49,7 +50,7 @@ const TOKAMACHI_MAX_ZOOM = 20;
  */
 const TOKAMACHI_BOUNDS: [number, number, number, number] = [138.5156, 36.8093, 138.9551, 37.3003];
 const TOKAMACHI_ATTRIBUTION =
-  '<a href="http://map.city.tokamachi.lg.jp/" target="_blank" rel="noreferrer">十日町市公開地理情報システム 航空写真</a>';
+  '<a href="http://map.city.tokamachi.lg.jp/" target="_blank" rel="noreferrer">十日町市 航空写真</a>';
 
 /** どちらの写真タイルも 256px 四方。 */
 const TILE_SIZE = 256;
@@ -156,8 +157,7 @@ export function createMap(container: HTMLElement): MapLibreMap {
 
   map.touchZoomRotate.disableRotation();
 
-  // 出典は必ず読めるようにしつつ、画面が狭いときは畳む（既定の自動判定に任せる）。
-  map.addControl(new AttributionControl());
+  map.addControl(new AttributionControl({ compact: false }));
   map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
   map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
 

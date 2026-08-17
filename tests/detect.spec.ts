@@ -7,6 +7,7 @@ import {
   NO_FIELD_SEED,
   hint,
   openApp,
+  openSettings,
   setTool,
   startEditing,
   PADDY_SEEDS,
@@ -32,9 +33,16 @@ test.describe('シード 1 点からの自動検出', () => {
   });
 
   test('十日町市の航空写真が出典付きで使われている', async ({ page }) => {
+    // 地図の隅は短い表記。狭い画面で 2 行を占めると、下のボタンを隠してしまう。
     const attribution = page.locator('.maplibregl-ctrl-attrib-inner');
     await expect(attribution).toContainText('十日町市');
-    await expect(attribution).toContainText('国土地理院');
+    await expect(attribution).toContainText('地理院タイル');
+
+    // 正式な名前は設定画面の「出典」で読める。
+    await openSettings(page);
+    const settings = page.locator('#settings');
+    await expect(settings).toContainText('国土地理院');
+    await expect(settings).toContainText('十日町市公開地理情報システム');
   });
 
   test('1 クリックで棚田の輪郭が取れ、そのまま編集できる', async ({ page }) => {

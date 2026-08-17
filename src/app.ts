@@ -22,7 +22,7 @@ import { MeasureLabels } from './measureLabels';
 import { applyOverlaySettings, OVERLAY_LAYER_IDS } from './overlays';
 import { PinLayer } from './pins';
 import { DetectPreview, PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID } from './preview';
-import { loadSettings, storeSettings, type Settings } from './settings';
+import { loadSettings, storeSettings, TEXT_SCALE_FACTOR, type Settings } from './settings';
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
 import { iconSvg } from './icons';
 import { element, isTyping, setIcon } from './ui/dom';
@@ -57,6 +57,7 @@ const EMPTY_EDIT: EditState = {
   kind: 'polygon',
   phase: 'drawing',
   vertexCount: 0,
+  selectedVertex: null,
   areaSquareMeters: null,
   totalMeters: null,
   canDeleteVertex: false,
@@ -84,15 +85,30 @@ export function startApp(): void {
   const offlineStatus = element('offline-status');
   const offlineSaveButton = element<HTMLButtonElement>('offline-save');
   const offlineClearButton = element<HTMLButtonElement>('offline-clear');
+  const drawActions = element('draw-actions');
+  const finishButton = element<HTMLButtonElement>('finish-draw');
+  const discardButton = element<HTMLButtonElement>('discard-draw');
+  const deleteVertexButton = element<HTMLButtonElement>('delete-vertex');
   const listOpenButton = element<HTMLButtonElement>('list-open');
   const listCloseButton = element<HTMLButtonElement>('list-close');
+  const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
   const app = element('app');
   setIcon(listOpenButton, 'list_alt');
   setIcon(listCloseButton, 'close');
+  setIcon(settingsOnMapButton, 'settings');
   listOpenButton.addEventListener('click', () => app.classList.add('list-open'));
   listCloseButton.addEventListener('click', () => app.classList.remove('list-open'));
 
   let settings: Settings = loadSettings();
+
+  /** 文字の大きさは CSS の倍率で効かせる。すべての font-size がこれに掛かる。 */
+  function applyTextScales(current: Settings): void {
+    const root = document.documentElement.style;
+    root.setProperty('--ui-scale', String(TEXT_SCALE_FACTOR[current.uiScale]));
+    root.setProperty('--label-scale', String(TEXT_SCALE_FACTOR[current.labelScale]));
+  }
+
+  applyTextScales(settings);
   const map: MapLibreMap = createMap(element('map'));
   // ブラウザから回す確認用の窓口。地図の状態（レイヤーの可視や濃さ）は DOM に出ないので、
   // ここから読めるようにしておく。読むだけで、アプリはこれを使わない。
@@ -163,6 +179,11 @@ export function startApp(): void {
         applyOverlaySettings(map, settings);
         storeSettings(settings);
       },
+      onTextScaleChange: (next) => {
+        settings = next;
+        applyTextScales(settings);
+        storeSettings(settings);
+      },
     });
     offlineSaveButton.addEventListener('click', () => void saveVisibleArea());
     offlineClearButton.addEventListener('click', () => void clearSavedTiles());
@@ -220,6 +241,11 @@ export function startApp(): void {
         items = items.map((item) => (item.id === editingId ? { ...item, vertices } : item));
       }
       scheduleStore();
+    }
+
+    /** いま確定できるか。最小の頂点数に届いていれば確定できる。 */
+    function canFinishNow(): boolean {
+      return edit.vertexCount >= minVertices(TOOLS[tool].kind);
     }
 
     function kindOfTool(): ItemKind {
@@ -410,9 +436,37 @@ export function startApp(): void {
         inspector.render(selected, selected !== null && selected.id === editingId);
       }
       app.classList.toggle('has-selection', selected !== null);
+      // キーボードも右クリックもない端末のために、同じことをボタンでもできるようにする。
+      const editing = mode === 'edit' && tool !== 'auto';
+      finishButton.hidden = !(editing && edit.phase === 'drawing' && canFinishNow());
+      discardButton.hidden = !(editing && edit.phase === 'drawing' && edit.vertexCount > 0);
+      deleteVertexButton.hidden = !(
+        editing &&
+        edit.phase === 'editing' &&
+        edit.selectedVertex !== null &&
+        edit.canDeleteVertex
+      );
+      drawActions.hidden =
+        finishButton.hidden && discardButton.hidden && deleteVertexButton.hidden;
     }
 
     // MARK: - 地図のクリック
+
+    finishButton.prepend(iconSvg('check', 18));
+    discardButton.prepend(iconSvg('close', 18));
+    deleteVertexButton.prepend(iconSvg('delete', 18));
+    finishButton.addEventListener('click', () => {
+      editor.finish();
+      finishButton.blur();
+    });
+    discardButton.addEventListener('click', () => {
+      editor.discard();
+      discardButton.blur();
+    });
+    deleteVertexButton.addEventListener('click', () => {
+      editor.deleteSelectedVertex();
+      deleteVertexButton.blur();
+    });
 
     map.on('mousemove', (event) => {
       // クリックの検出が走っているあいだは下見を止める。同じレイヤーを隠し合う。

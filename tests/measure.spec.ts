@@ -45,7 +45,7 @@ test.describe('地図上で距離を測る', () => {
   test('2 点置いて終えると、計測として一覧に残る', async ({ page }) => {
     await clickMap(page, 400, 300);
     // 1 点では Enter もダブルクリックも効かないので、そう案内しない。
-    await expect(hint(page)).toHaveText('もう 1 点クリックすると距離が出ます（Esc で消去）');
+    await expect(hint(page)).toHaveText('もう 1 点で距離が出ます（「やめる」で消去）');
 
     await clickMap(page, 500, 300);
     await page.keyboard.press('Enter');
