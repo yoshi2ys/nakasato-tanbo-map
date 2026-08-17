@@ -4,7 +4,7 @@ import { defineConfig } from '@playwright/test';
 const useDist = process.env['TANBO_TEST_DIST'] === '1';
 const port = useDist ? 4173 : 5173;
 /** GitHub Pages のサブパスに合わせてあるので、dev も preview もこの下に出る。 */
-const BASE = '/tokamachi-tanbo-map/';
+const BASE = '/nakasato-tanbo-map/';
 
 export default defineConfig({
   testDir: 'tests',

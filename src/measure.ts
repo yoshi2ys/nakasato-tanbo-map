@@ -1,7 +1,6 @@
-import { distance } from '@turf/distance';
 import type { FeatureCollection } from 'geojson';
 import { GeoJSONSource, Marker, type Map as MapLibreMap, type MapMouseEvent } from 'maplibre-gl';
-import { midpoint, type Vertex } from './draw';
+import { midpoint, segmentLength, type Vertex } from './geometry';
 import { formatDistance } from './units';
 
 const SOURCE_ID = 'tanbo-measure';
@@ -21,10 +20,6 @@ export interface MeasureState {
 }
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-
-function metersBetween(from: Vertex, to: Vertex): number {
-  return distance(from, to, { units: 'meters' });
-}
 
 /**
  * 地図上で距離を測る。クリックで点を継ぎ足していき、各辺の長さを中点に、合計をパネルに出す。
@@ -138,7 +133,7 @@ export class MeasureTool {
     if (line.length < 2) return null;
     let total = 0;
     for (let index = 1; index < line.length; index += 1) {
-      total += metersBetween(line[index - 1]!, line[index]!);
+      total += segmentLength(line[index - 1]!, line[index]!);
     }
     return total;
   }
@@ -193,7 +188,7 @@ export class MeasureTool {
       if (this.#map.project(from).dist(this.#map.project(to)) < MIN_LABEL_EDGE_PIXELS) continue;
       wanted.set(index, {
         position: midpoint(from, to),
-        text: formatDistance(metersBetween(from, to)),
+        text: formatDistance(segmentLength(from, to)),
       });
     }
 

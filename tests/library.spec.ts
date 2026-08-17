@@ -200,17 +200,18 @@ test.describe('複数の田んぼを持ち回る', () => {
     await expect(hint(page)).toContainText('読めませんでした');
     expect(await paddyRows(page)).toHaveLength(0);
 
-    const noPolygon = join(work, 'point.geojson');
+    // 点は「取り込めないもの」ではなくピンになる。形として読めないものだけを弾く。
+    const unusable = join(work, 'unusable.geojson');
     writeFileSync(
-      noPolygon,
+      unusable,
       JSON.stringify({
         type: 'FeatureCollection',
         features: [
-          { type: 'Feature', geometry: { type: 'Point', coordinates: [139, 37] }, properties: {} },
+          { type: 'Feature', geometry: { type: 'GeometryCollection', geometries: [] }, properties: {} },
         ],
       })
     );
-    await page.setInputFiles('#import-file', noPolygon);
+    await page.setInputFiles('#import-file', unusable);
     await page.waitForTimeout(400);
     await expect(hint(page)).toContainText('取り込める');
   });

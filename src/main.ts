@@ -1,5 +1,5 @@
 import './style.css';
-import { FILL_LAYER_ID, PolygonDrawer, type DrawState } from './draw';
+import { EDIT_FILL_LAYER_ID, ItemEditor, type EditState } from './editor';
 import {
   DetectionError,
   cameraKey,
@@ -12,17 +12,18 @@ import { TILE_SOURCES, createMap } from './map';
 import { MeasureTool, type MeasureState } from './measure';
 import {
   ImportError,
+  defaultColor,
   fromGeoJSON,
-  isPaddyReliable,
+  isItemReliable,
+  itemArea,
   loadStored,
   merge,
-  newPaddy,
-  paddyArea,
+  newItem,
   store,
   toGeoJSON,
-  type Paddy,
-} from './paddies';
-import { SavedPaddyLayer } from './paddyLayer';
+  type Item,
+} from './items';
+import { ItemLayer } from './itemLayer';
 import {
   SAVE_TILE_LIMIT,
   cacheStats,
@@ -59,10 +60,12 @@ const offlineClearButton = element<HTMLButtonElement>('offline-clear');
 /** 自動検出の進行状況。ヒント欄を占有するので、描画の状態より優先して出す。 */
 type Detection = { status: 'idle' } | { status: 'running' } | { status: 'failed'; message: string };
 
-let drawState: DrawState = {
-  mode: 'drawing',
+let drawState: EditState = {
+  kind: 'polygon',
+  phase: 'drawing',
   vertexCount: 0,
   areaSquareMeters: null,
+  totalMeters: null,
   canDeleteVertex: false,
   selfIntersecting: false,
 };
@@ -79,7 +82,7 @@ let ready = false;
 /** 検出ごとの通し番号。割り込まれた古い検出の結果を捨てるために使う。 */
 let detectionToken = 0;
 
-let paddies: Paddy[] = [];
+let paddies: Item[] = [];
 /** いま編集している田んぼ。まだ閉合していないあいだは null。 */
 let activeId: string | null = null;
 // setTimeout の戻り値は環境で型が違うので、環境に合わせて受ける。
@@ -105,7 +108,7 @@ function hintText(): string {
   }
   if (drawState.selfIntersecting) return '輪郭が交差しています。この面積は当てになりません';
   if (mode === 'auto') return '田んぼの中をクリックすると輪郭を推定します';
-  if (drawState.mode === 'editing') {
+  if (drawState.phase === 'editing') {
     return drawState.canDeleteVertex
       ? '頂点をドラッグで移動、中点をクリックで追加。削除は右クリック、または選択して Delete'
       : '頂点をドラッグで移動、中点をクリックで追加（これ以上は減らせません）';
@@ -236,9 +239,9 @@ void refreshOfflineStatus();
 // タイルの読み込みではなくスタイルの用意ができた時点で始める。
 // 写真タイルが落ちてもアプリが起動しないという状態を作らないため。
 map.on('style.load', () => {
-  const drawer = new PolygonDrawer(map, (state) => {
-    const closed = state.mode === 'editing';
-    const wasClosed = drawState.mode === 'editing';
+  const drawer = new ItemEditor(map, (state) => {
+    const closed = state.phase === 'editing';
+    const wasClosed = drawState.phase === 'editing';
     drawState = state;
 
     if (closed) syncActivePaddy();
@@ -246,7 +249,7 @@ map.on('style.load', () => {
     if (closed !== wasClosed) listDirty = true;
     render();
   });
-  const savedLayer = new SavedPaddyLayer(map, FILL_LAYER_ID);
+  const savedLayer = new ItemLayer(map, EDIT_FILL_LAYER_ID);
   // 計測の線は常に一番上に置きたいので、描画用のレイヤーより後に足す。
   const measure = new MeasureTool(map, (state) => {
     measureState = state;
@@ -260,7 +263,7 @@ map.on('style.load', () => {
 
     const existing = paddies.find((paddy) => paddy.id === activeId);
     if (existing === undefined) {
-      const paddy = newPaddy(vertices, paddies);
+      const paddy = newItem('paddy', vertices, paddies);
       paddies = [...paddies, paddy];
       activeId = paddy.id;
       listDirty = true;
@@ -275,7 +278,7 @@ map.on('style.load', () => {
 
   /** 編集中の 1 枚を除いた保存済みを地図に反映する。 */
   function refreshSavedLayer(): void {
-    savedLayer.setPaddies(paddies.filter((paddy) => paddy.id !== activeId));
+    savedLayer.setItems(paddies, activeId, activeId);
   }
 
   function selectPaddy(id: string): void {
@@ -288,7 +291,7 @@ map.on('style.load', () => {
     detection = { status: 'idle' };
     notice = null;
     setMode('manual');
-    drawer.load(paddy.vertices);
+    drawer.load('polygon', paddy.vertices, paddy.color);
     refreshSavedLayer();
 
     const lngs = paddy.vertices.map(([lng]) => lng);
@@ -313,7 +316,7 @@ map.on('style.load', () => {
     paddies = paddies.filter((item) => item.id !== id);
     if (activeId === id) {
       activeId = null;
-      drawer.reset();
+      drawer.begin('polygon', defaultColor('paddy'));
     }
     notice = null;
     persist();
@@ -323,9 +326,9 @@ map.on('style.load', () => {
   }
 
   /** 交差した輪郭は面積を出さない。もっともらしい数字を並べるのが一番まずい。 */
-  function areaLabel(paddy: Paddy): string {
-    if (!isPaddyReliable(paddy)) return '輪郭が交差';
-    return `${formatArea(paddyArea(paddy)).squareMeters} ㎡`;
+  function areaLabel(paddy: Item): string {
+    if (!isItemReliable(paddy)) return '輪郭が交差';
+    return `${formatArea(itemArea(paddy) ?? 0).squareMeters} ㎡`;
   }
 
   function renderList(): void {
@@ -417,7 +420,7 @@ map.on('style.load', () => {
     drawer.setEnabled(next === 'manual');
     measure.setEnabled(next === 'measure');
     // モードを持っているのはここなので、既定のカーソルもここで決める。
-    // 手動のときだけ、頂点に重なった瞬間のカーソルを PolygonDrawer が上書きする。
+    // 手動のときだけ、頂点に重なった瞬間のカーソルを ItemEditor が上書きする。
     map.getCanvas().style.cursor = next === 'manual' ? '' : 'crosshair';
   }
 
@@ -431,7 +434,7 @@ map.on('style.load', () => {
     // 保存済みの 1 枚は残したまま、次の田んぼを描き始める。
     detectionToken += 1;
     activeId = null;
-    drawer.reset();
+    drawer.begin('polygon', defaultColor('paddy'));
     refreshSavedLayer();
     detection = { status: 'idle' };
     notice = null;
@@ -479,9 +482,9 @@ map.on('style.load', () => {
     try {
       const imported = fromGeoJSON(await file.text());
       // 取り込んだものは別の田んぼとして足す。既存を消したいときは一覧から削除する。
-      paddies = merge(paddies, imported.paddies);
+      paddies = merge(paddies, imported.items);
       activeId = null;
-      drawer.reset();
+      drawer.begin('polygon', defaultColor('paddy'));
       refreshSavedLayer();
       notice = imported.skipped === 0 ? null : `${imported.skipped} 件は取り込めませんでした`;
       persist();
@@ -527,7 +530,7 @@ map.on('style.load', () => {
 
       // 検出は常に新しい 1 枚として扱う。編集中のものを黙って置き換えない。
       activeId = null;
-      drawer.load(vertices);
+      drawer.load('polygon', vertices, defaultColor('paddy'));
       detection = { status: 'idle' };
       // 検出結果は下書き。そのまま頂点を直せるよう、手動（編集）に戻す。
       setMode('manual');

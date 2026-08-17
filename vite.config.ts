@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-/** GitHub Pages の公開先。`https://yoshi2ys.github.io/tokamachi-tanbo-map/` に置く。 */
-const BASE = '/tokamachi-tanbo-map/';
+/** GitHub Pages の公開先。`https://yoshi2ys.github.io/nakasato-tanbo-map/` に置く。 */
+const BASE = '/nakasato-tanbo-map/';
 
 export default defineConfig({
   base: BASE,
@@ -13,7 +13,7 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: '十日町 田んぼマップ',
+        name: '中里 田んぼマップ',
         short_name: '田んぼマップ',
         description: '航空写真から田んぼの輪郭を描いて面積を出す道具',
         lang: 'ja',

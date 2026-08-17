@@ -1,6 +1,6 @@
 import opencvUrl from '@techstark/opencv-js/dist/opencv.js?url';
 import type { Map as MapLibreMap, Point } from 'maplibre-gl';
-import type { Vertex } from './draw';
+import type { Vertex } from './geometry';
 
 /** `@techstark/opencv-js` の名前空間。読み込みは script タグなので型だけ借りる。 */
 type OpenCV = typeof import('@techstark/opencv-js');
