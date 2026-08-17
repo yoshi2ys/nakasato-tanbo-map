@@ -1,11 +1,5 @@
 import { expect, type Page } from '@playwright/test';
 
-/** `TANBO_TEST_STANDALONE=1` のときに開く、単一 HTML の file:// URL。 */
-const standaloneURL =
-  process.env['TANBO_TEST_STANDALONE'] === '1'
-    ? new URL('../dist-standalone/index.html', import.meta.url).href
-    : null;
-
 /** 既定表示（十日町市）で確実に圃場の中心に落ちるシード。view-1x の画から拾った。 */
 export const PADDY_SEEDS: [x: number, y: number][] = [
   [505, 200],
@@ -25,9 +19,8 @@ export const EDIT_HINT_MIN = '頂点をドラッグで移動、中点をクリ�
 
 /** 地図のスタイルが揃い、パネルが操作できるようになるまで待つ。 */
 export async function openApp(page: Page, query = ''): Promise<void> {
-  await page.goto(standaloneURL === null ? `/${query}` : `${standaloneURL}${query}`, {
-    waitUntil: 'networkidle',
-  });
+  // baseURL は公開先と同じサブパスまで含むので、相対で開く。
+  await page.goto(`.${query}`, { waitUntil: 'networkidle' });
   await waitForApp(page);
 }
 

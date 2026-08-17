@@ -158,29 +158,31 @@ function storeTile(url: string, tile: StoredTile): Promise<boolean> {
     const transaction = db.transaction([STORE, TOTALS_STORE], 'readwrite');
     const tiles = transaction.objectStore(STORE);
     // 同じ URL を二重に数えない。取得は基本 1 回だが、表示と保存が同時に走ることはある。
+    // 同じ URL のタイルは中身も同じとみなす（写真が差し替わったら「消す」で取り直す）。
     const known = (await request(tiles.getKey(url))) !== undefined;
     tiles.put(tile, url);
 
+    // 控えはメモリではなく、このトランザクションの中で読む。「消す」と重なったとき、
+    // IndexedDB は同じストアへの readwrite を直列に流すので、消したあとの 0 が見える。
+    let next: CacheStats | null = null;
     if (!known) {
-      const current = await readTotals(transaction);
-      const next: CacheStats = {
-        count: current.count + 1,
-        bytes: current.bytes + tile.body.byteLength,
-      };
+      const current = await readStoredTotals(transaction);
+      next = { count: current.count + 1, bytes: current.bytes + tile.body.byteLength };
       transaction.objectStore(TOTALS_STORE).put(next, TOTALS_KEY);
-      totals = next;
     }
 
+    // 書けたと分かってから控えを更新する。先に更新すると、失敗したのに
+    // 「保存しました」と出る（保存領域が一杯のときにまさにそうなる）。
     await completed(transaction);
+    if (next !== null) totals = next;
     return true;
   });
 }
 
-async function readTotals(transaction: IDBTransaction): Promise<CacheStats> {
-  totals ??= (await request<CacheStats | undefined>(
+function readStoredTotals(transaction: IDBTransaction): Promise<CacheStats> {
+  return request<CacheStats | undefined>(
     transaction.objectStore(TOTALS_STORE).get(TOTALS_KEY)
-  )) ?? { count: 0, bytes: 0 };
-  return totals;
+  ).then((stored) => stored ?? { count: 0, bytes: 0 });
 }
 
 /** タイルを取ってくる。ためるかどうかは呼び出し側が決める。 */
@@ -216,9 +218,10 @@ export function installTileCache(): void {
 /** ためた枚数と大きさ。 */
 export function cacheStats(): Promise<CacheStats> {
   if (totals !== null) return Promise.resolve(totals);
-  return withDatabase({ count: 0, bytes: 0 }, (db) =>
-    readTotals(db.transaction(TOTALS_STORE))
-  );
+  return withDatabase({ count: 0, bytes: 0 }, async (db) => {
+    totals = await readStoredTotals(db.transaction(TOTALS_STORE));
+    return totals;
+  });
 }
 
 /** ためたタイルをすべて捨てる。 */
