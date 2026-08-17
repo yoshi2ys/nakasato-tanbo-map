@@ -1,17 +1,15 @@
-import { iconSvg, PIN_ICONS } from '../icons';
-import { isItemReliable, itemArea, itemLength, type Item } from '../items';
+import { iconSvg, PIN_ICONS, type IconName } from '../icons';
+import { isItemReliable, itemArea, itemLength, kindLabel, type Item } from '../items';
 import { formatArea, formatDistance } from '../units';
 import { element, setIcon } from './dom';
 
 /** よく使う色。1 クリックで置けるように並べる。 */
 const SWATCHES = ['#ffb300', '#ff7043', '#e53935', '#8e24aa', '#3949ab', '#0071e3', '#00acc1', '#43a047', '#ffffff', '#1d1d1f'];
 
-const KIND_LABEL = { paddy: '田んぼ', measure: '計測', pin: 'ピン' } as const;
-
 export interface InspectorCallbacks {
   onRename: (id: string, name: string) => void;
   onRecolor: (id: string, color: string) => void;
-  onIcon: (id: string, icon: string) => void;
+  onIcon: (id: string, icon: IconName) => void;
   onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
@@ -91,16 +89,7 @@ export class Inspector {
     this.#editButton.hidden = true;
     this.#deleteButton.hidden = true;
 
-    this.#area.hidden = areaSquareMeters === null;
-    this.#area.classList.remove('unreliable');
-    if (areaSquareMeters !== null) {
-      const formatted = formatArea(areaSquareMeters);
-      this.#areaSquareMeters.textContent = formatted.squareMeters;
-      this.#areaTan.textContent = formatted.tan;
-      this.#areaSe.textContent = formatted.se;
-    }
-    this.#measure.hidden = totalMeters === null;
-    this.#measureTotal.textContent = totalMeters === null ? '' : formatDistance(totalMeters);
+    this.#showMetrics(areaSquareMeters, totalMeters, true);
   }
 
   render(item: Item | null, editing: boolean): void {
@@ -116,7 +105,7 @@ export class Inspector {
     this.#nameField.hidden = false;
     this.#colorField.hidden = false;
     this.#deleteButton.hidden = false;
-    this.#kind.textContent = KIND_LABEL[item.kind];
+    this.#kind.textContent = kindLabel(item.kind);
     // 打っている最中に書き戻すと、変換中の文字が消える。
     if (document.activeElement !== this.#name) this.#name.value = item.name;
     this.#color.value = item.color;
@@ -131,20 +120,7 @@ export class Inspector {
       element_.style.color = element_.dataset['icon'] === item.icon ? item.color : '';
     }
 
-    const area = itemArea(item);
-    const reliable = isItemReliable(item);
-    this.#area.hidden = area === null;
-    this.#area.classList.toggle('unreliable', !reliable);
-    if (area !== null) {
-      const formatted = formatArea(area);
-      this.#areaSquareMeters.textContent = formatted.squareMeters;
-      this.#areaTan.textContent = formatted.tan;
-      this.#areaSe.textContent = formatted.se;
-    }
-
-    const length = itemLength(item);
-    this.#measure.hidden = length === null;
-    this.#measureTotal.textContent = length === null ? '' : formatDistance(length);
+    this.#showMetrics(itemArea(item), itemLength(item), isItemReliable(item));
 
     const position = item.kind === 'pin' ? item.vertices[0] : undefined;
     this.#position.hidden = position === undefined;
@@ -153,6 +129,20 @@ export class Inspector {
     }
 
     this.#editButton.hidden = editing;
+  }
+
+  /** 面積と長さの欄。描きかけと確定後で同じ出し方をする。 */
+  #showMetrics(areaSquareMeters: number | null, totalMeters: number | null, reliable: boolean): void {
+    this.#area.hidden = areaSquareMeters === null;
+    this.#area.classList.toggle('unreliable', !reliable);
+    if (areaSquareMeters !== null) {
+      const formatted = formatArea(areaSquareMeters);
+      this.#areaSquareMeters.textContent = formatted.squareMeters;
+      this.#areaTan.textContent = formatted.tan;
+      this.#areaSe.textContent = formatted.se;
+    }
+    this.#measure.hidden = totalMeters === null;
+    this.#measureTotal.textContent = totalMeters === null ? '' : formatDistance(totalMeters);
   }
 
   #buildSwatches(): void {

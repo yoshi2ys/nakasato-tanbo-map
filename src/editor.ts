@@ -1,5 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import { GeoJSONSource, type Map as MapLibreMap, type MapMouseEvent, type Point } from 'maplibre-gl';
+import { isTyping } from './ui/dom';
 import {
   isSelfIntersecting,
   lineLength,
@@ -63,17 +64,6 @@ export interface EditState {
 const EMPTY_COLLECTION: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
 /**
- * 入力欄に文字を打っているところか。
- *
- * 名前を打っている最中の Backspace が頂点の削除に化けると、気づかないうちに形が変わる。
- */
-export function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  return ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName);
-}
-
-/**
  * 選択中のものを描いて、直接いじらせる。
  *
  * 描画中はクリックで頂点を足し、開始点への近接クリック・ダブルクリック・Enter で確定する。
@@ -113,7 +103,8 @@ export class ItemEditor {
 
     // 閉合のダブルクリックでズームさせない。
     map.doubleClickZoom.disable();
-    this.#render();
+    // ここで onChange まで呼ぶと、まだ組み上がっていない画面を触りに行く。
+    this.#source.setData(this.#buildCollection());
   }
 
   #addInputListeners(): void {
@@ -161,10 +152,6 @@ export class ItemEditor {
     this.#render();
   }
 
-  get kind(): EditKind {
-    return this.#kind;
-  }
-
   /** いま編集している頂点。保存するときに読む（毎フレームではないのでコピーで渡す）。 */
   get vertices(): Vertex[] {
     return this.#vertices.map((vertex) => [...vertex] satisfies Vertex);
@@ -203,27 +190,10 @@ export class ItemEditor {
     this.#commitVertices();
   }
 
-  /** 編集をやめる。描いたものは呼び出し側が持っている前提で、こちらは手放すだけ。 */
-  clear(): void {
-    this.begin(this.#kind, this.#color);
-  }
-
   setColor(color: string): void {
     if (this.#color === color) return;
     this.#color = color;
     this.#applyColor();
-  }
-
-  /** レイヤーとソースとリスナを片付ける。 */
-  destroy(): void {
-    this.#removeInputListeners();
-    this.#endDrag();
-    this.#map.off('zoomend', this.#handleZoomEnd);
-    if (this.#pendingFrame !== null) cancelAnimationFrame(this.#pendingFrame);
-    for (const id of EDIT_LAYER_IDS) {
-      if (this.#map.getLayer(id) !== undefined) this.#map.removeLayer(id);
-    }
-    if (this.#map.getSource(SOURCE_ID) !== undefined) this.#map.removeSource(SOURCE_ID);
   }
 
   // MARK: - 描画

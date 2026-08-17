@@ -8,6 +8,17 @@ export function element<T extends HTMLElement>(id: string): T {
 }
 
 /** アイコンだけのボタンの中身を差し替える。 */
-export function setIcon(button: HTMLElement, name: string, sizePx = 18): void {
-  button.replaceChildren(iconSvg(name, sizePx));
+export function setIcon(button: HTMLElement, name: string): void {
+  button.replaceChildren(iconSvg(name, 18));
+}
+
+/**
+ * 入力欄に文字を打っているところか。
+ *
+ * 名前を打っている最中の Backspace が頂点の削除に化けると、気づかないうちに形が変わる。
+ */
+export function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  return ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName);
 }

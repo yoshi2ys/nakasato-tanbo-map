@@ -94,7 +94,7 @@ export function tileSources(settings: Settings): TileSource[] {
   return [...PHOTO_SOURCES, ...overlayTileSources(settings)];
 }
 
-export function createMap(container: HTMLElement, _settings: Settings): MapLibreMap {
+export function createMap(container: HTMLElement): MapLibreMap {
   const map = new MapLibreMap({
     container,
     center: initialCenter(),

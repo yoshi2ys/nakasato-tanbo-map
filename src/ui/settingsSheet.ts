@@ -4,8 +4,6 @@ import { element, setIcon } from './dom';
 
 export interface SettingsCallbacks {
   onOverlayChange: (settings: Settings) => void;
-  onSaveTiles: () => void;
-  onClearTiles: () => void;
 }
 
 /**
@@ -34,13 +32,6 @@ export class SettingsSheet {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !this.#root.hidden) this.close();
     });
-
-    element<HTMLButtonElement>('offline-save').addEventListener('click', () =>
-      this.#callbacks.onSaveTiles()
-    );
-    element<HTMLButtonElement>('offline-clear').addEventListener('click', () =>
-      this.#callbacks.onClearTiles()
-    );
 
     this.#build();
   }

@@ -52,6 +52,11 @@ export const PIN_ICONS: IconName[] = [
   'location_on', 'water_drop', 'agriculture', 'grass', 'home', 'warehouse', 'local_shipping', 'bolt', 'warning', 'flag', 'star', 'photo_camera', 'park', 'route', 'door_open', 'waves',
 ];
 
+/** 持っているアイコンの名前か。取り込んだファイルの属性は当てにならないので、通す前に見る。 */
+export function isIconName(value: unknown): value is IconName {
+  return typeof value === 'string' && value in ICONS;
+}
+
 /** 知らない名前が来たら既定に落とす。取り込んだファイルの属性は当てにならない。 */
 export function iconPath(name: string): string {
   return ICONS[name as IconName] ?? ICONS.location_on;

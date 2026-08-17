@@ -71,28 +71,26 @@ export class PinLayer {
    * 編集中のピンだけドラッグで動かせるようにする。
    * 面や線と違って頂点を掴む代わりに、ピンそのものを掴む。
    */
-  setDraggable(id: string | null, onMove: (position: Vertex) => void): void {
-    if (this.#draggingId !== null) {
-      const previous = this.#markers.get(this.#draggingId);
-      previous?.setDraggable(false);
-      previous?.off('dragend', this.#handleDragEnd);
-      previous?.off('drag', this.#handleDrag);
-    }
-
+  setDraggable(id: string, onMove: (position: Vertex) => void): void {
+    this.clearDraggable();
     this.#draggingId = id;
     this.#onMove = onMove;
-    if (id === null) return;
 
     const marker = this.#markers.get(id);
     if (marker === undefined) return;
     marker.setDraggable(true);
     marker.on('drag', this.#handleDrag);
-    marker.on('dragend', this.#handleDragEnd);
+    marker.on('dragend', this.#handleDrag);
   }
 
-  destroy(): void {
-    for (const marker of this.#markers.values()) marker.remove();
-    this.#markers.clear();
+  clearDraggable(): void {
+    if (this.#draggingId === null) return;
+    const marker = this.#markers.get(this.#draggingId);
+    marker?.setDraggable(false);
+    marker?.off('drag', this.#handleDrag);
+    marker?.off('dragend', this.#handleDrag);
+    this.#draggingId = null;
+    this.#onMove = null;
   }
 
   #handleDrag = (): void => {
@@ -100,9 +98,5 @@ export class PinLayer {
     const marker = this.#markers.get(this.#draggingId);
     if (marker === undefined) return;
     this.#onMove(marker.getLngLat().toArray());
-  };
-
-  #handleDragEnd = (): void => {
-    this.#handleDrag();
   };
 }

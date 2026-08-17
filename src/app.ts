@@ -1,13 +1,6 @@
-import type { Map as MapLibreMap } from 'maplibre-gl';
-import {
-  DetectionError,
-  cameraKey,
-  captureMap,
-  detectOutline,
-  loadOpenCV,
-  waitForIdle,
-} from './detect';
-import { ItemEditor, isTyping, type EditKind, type EditState } from './editor';
+import { LngLatBounds, type Map as MapLibreMap, type Point } from 'maplibre-gl';
+import { DetectionError, captureMasked, cameraKey, detectOutline, loadOpenCV } from './detect';
+import { EDIT_FILL_LAYER_ID, ItemEditor, type EditKind, type EditState } from './editor';
 import type { Vertex } from './geometry';
 import { hintText, type AppMode, type Detection, type Tool } from './hints';
 import { ItemLayer, ITEM_CASING_LAYER_ID, ITEM_FILL_LAYER_ID, ITEM_LINE_LAYER_ID } from './itemLayer';
@@ -31,25 +24,29 @@ import { PinLayer } from './pins';
 import { DetectPreview, PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID } from './preview';
 import { loadSettings, storeSettings, type Settings } from './settings';
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
-import { element } from './ui/dom';
+import { element, isTyping } from './ui/dom';
 import { Inspector } from './ui/inspector';
 import { Sidebar } from './ui/sidebar';
 import { SettingsSheet } from './ui/settingsSheet';
 
-/** ツールと、編集器が扱う形の対応。 */
-const TOOL_KIND: Record<Exclude<Tool, 'auto'>, EditKind> = {
-  manual: 'polygon',
+/**
+ * 道具と、それが作るものと、その形。自動検出は田んぼを作るので手動範囲と同じ組。
+ * 3 つの表に分けると、種類から形を引くのに 2 回引き直すことになる。
+ */
+const TOOLS: Record<Tool, { kind: ItemKind; shape: EditKind }> = {
+  manual: { kind: 'paddy', shape: 'polygon' },
+  auto: { kind: 'paddy', shape: 'polygon' },
+  measure: { kind: 'measure', shape: 'line' },
+  pin: { kind: 'pin', shape: 'point' },
+};
+
+const KIND_SHAPE: Record<ItemKind, EditKind> = {
+  paddy: 'polygon',
   measure: 'line',
   pin: 'point',
 };
 
-const KIND_OF_TOOL: Record<Exclude<Tool, 'auto'>, ItemKind> = {
-  manual: 'paddy',
-  measure: 'measure',
-  pin: 'pin',
-};
-
-const TOOL_OF_KIND: Record<ItemKind, Tool> = {
+const KIND_TOOL: Record<ItemKind, Tool> = {
   paddy: 'manual',
   measure: 'measure',
   pin: 'pin',
@@ -84,12 +81,11 @@ export function startApp(): void {
   const offlineClearButton = element<HTMLButtonElement>('offline-clear');
 
   let settings: Settings = loadSettings();
-  const map: MapLibreMap = createMap(element('map'), settings);
+  const map: MapLibreMap = createMap(element('map'));
   // ブラウザから回す確認用の窓口。地図の状態（レイヤーの可視や濃さ）は DOM に出ないので、
   // ここから読めるようにしておく。読むだけで、アプリはこれを使わない。
   (window as unknown as { __tanboMap: MapLibreMap }).__tanboMap = map;
 
-  let ready = false;
   let mode: AppMode = 'view';
   let tool: Tool = 'manual';
   let items: Item[] = [];
@@ -122,10 +118,10 @@ export function startApp(): void {
       if (state.phase === 'editing') syncEditingItem(wasDrawing);
       render();
     });
-    const itemLayer = new ItemLayer(map, 'tanbo-edit-fill');
+    const itemLayer = new ItemLayer(map, EDIT_FILL_LAYER_ID);
     const pinLayer = new PinLayer(map, (id) => selectItem(id));
     const labels = new MeasureLabels(map);
-    const preview = new DetectPreview(map, (masked) => setDetectionMasked(masked), 'tanbo-edit-fill');
+    const preview = new DetectPreview(map, setDetectionMasked, EDIT_FILL_LAYER_ID);
     const sidebar = new Sidebar({
       onSelect: (id) => selectItem(id),
       onToggleVisible: (id) => toggleVisible(id),
@@ -149,15 +145,15 @@ export function startApp(): void {
         render();
       },
     });
-    const settingsSheet = new SettingsSheet(settings, {
+    new SettingsSheet(settings, {
       onOverlayChange: (next) => {
         settings = next;
         applyOverlaySettings(map, settings);
         storeSettings(settings);
       },
-      onSaveTiles: () => void saveVisibleArea(),
-      onClearTiles: () => void clearSavedTiles(),
     });
+    offlineSaveButton.addEventListener('click', () => void saveVisibleArea());
+    offlineClearButton.addEventListener('click', () => void clearSavedTiles());
 
     // MARK: - 保存
 
@@ -215,7 +211,12 @@ export function startApp(): void {
     }
 
     function kindOfTool(): ItemKind {
-      return KIND_OF_TOOL[tool === 'auto' ? 'manual' : tool];
+      return TOOLS[tool].kind;
+    }
+
+    /** いまの道具で、新しく描き始める。 */
+    function restartEditor(): void {
+      editor.begin(TOOLS[tool].shape, defaultColor(TOOLS[tool].kind));
     }
 
     function selectItem(id: string): void {
@@ -238,9 +239,9 @@ export function startApp(): void {
     }
 
     function loadIntoEditor(item: Item): void {
-      setTool(TOOL_OF_KIND[item.kind], false);
+      setTool(KIND_TOOL[item.kind], false);
       editingId = item.id;
-      editor.load(TOOL_KIND[TOOL_OF_KIND[item.kind] as Exclude<Tool, 'auto'>], item.vertices, item.color);
+      editor.load(KIND_SHAPE[item.kind], item.vertices, item.color);
       if (item.kind === 'pin') pinLayer.setDraggable(item.id, (position) => movePin(item.id, position));
     }
 
@@ -251,20 +252,18 @@ export function startApp(): void {
     }
 
     function fitTo(item: Item): void {
-      const lngs = item.vertices.map(([lng]) => lng);
-      const lats = item.vertices.map(([, lat]) => lat);
-      if (lngs.length === 0) return;
+      const first = item.vertices[0];
+      if (first === undefined) return;
+      // 点に fitBounds は使えない（範囲が潰れる）。
       if (item.kind === 'pin') {
-        map.easeTo({ center: item.vertices[0]!, duration: 400 });
+        map.easeTo({ center: first, duration: 400 });
         return;
       }
-      map.fitBounds(
-        [
-          [Math.min(...lngs), Math.min(...lats)],
-          [Math.max(...lngs), Math.max(...lats)],
-        ],
-        { padding: 80, duration: 400 }
+      const bounds = item.vertices.reduce(
+        (box, vertex) => box.extend(vertex),
+        new LngLatBounds(first, first)
       );
+      map.fitBounds(bounds, { padding: 80, duration: 400 });
     }
 
     function toggleVisible(id: string): void {
@@ -279,7 +278,7 @@ export function startApp(): void {
       items = items.filter((candidate) => candidate.id !== id);
       if (editingId === id) {
         editingId = null;
-        editor.begin(TOOL_KIND[tool === 'auto' ? 'manual' : tool], defaultColor(kindOfTool()));
+        restartEditor();
       }
       if (selectedId === id) selectedId = null;
       notice = null;
@@ -292,8 +291,8 @@ export function startApp(): void {
     function commitEditing(): void {
       if (editingId === null && edit.vertexCount === 0) return;
       editingId = null;
-      pinLayer.setDraggable(null, () => undefined);
-      editor.begin(TOOL_KIND[tool === 'auto' ? 'manual' : tool], defaultColor(kindOfTool()));
+      pinLayer.clearDraggable();
+      restartEditor();
       edit = EMPTY_EDIT;
       labels.clear();
     }
@@ -328,9 +327,7 @@ export function startApp(): void {
       editor.setEnabled(mode === 'edit' && next !== 'auto');
       preview.setEnabled(mode === 'edit' && next === 'auto');
       if (next === 'auto') void loadOpenCV().catch(() => undefined);
-      if (restart && next !== 'auto') {
-        editor.begin(TOOL_KIND[next], defaultColor(KIND_OF_TOOL[next]));
-      }
+      if (restart && next !== 'auto') restartEditor();
       map.getCanvas().style.cursor = mode === 'edit' && next === 'auto' ? 'crosshair' : '';
       render();
     }
@@ -358,7 +355,6 @@ export function startApp(): void {
       const selected = selectedItem();
 
       hint.textContent = hintText({
-        ready,
         mode,
         tool,
         edit,
@@ -372,10 +368,10 @@ export function startApp(): void {
         edit.selfIntersecting || detection.status === 'failed' || notice !== null
       );
 
-      for (const input of modeInputs) input.disabled = !ready || busy;
-      for (const input of toolInputs) input.disabled = !ready || busy;
-      exportButton.disabled = !ready || busy || items.length === 0;
-      importButton.disabled = !ready || busy;
+      for (const input of modeInputs) input.disabled = busy;
+      for (const input of toolInputs) input.disabled = busy;
+      exportButton.disabled = busy || items.length === 0;
+      importButton.disabled = busy;
 
       itemLayer.setItems(items, selectedId, editingId);
       pinLayer.setPins(
@@ -445,7 +441,7 @@ export function startApp(): void {
 
     // MARK: - 自動検出
 
-    async function detectAt(point: Parameters<typeof detectOutline>[2]): Promise<void> {
+    async function detectAt(point: Point): Promise<void> {
       const token = (detectionToken += 1);
       // クリックした瞬間のカメラ。タイル待ちのあいだに地図を動かされると、
       // 指した場所と写真がずれる。
@@ -455,26 +451,12 @@ export function startApp(): void {
 
       try {
         // 描いたものや重ねた地図が写り込むと、その線がフラッドフィルの壁になる。
-        // タイルを待つのは隠す前。隠したまま待つと、そのあいだ描いたものが消えて見える。
-        await waitForIdle(map);
+        const snapshot = await captureMasked(map, setDetectionMasked);
         if (cameraKey(map) !== clickedCamera) {
           throw new DetectionError('地図が動きました。もう一度クリックしてください');
         }
 
-        setDetectionMasked(true);
-        let capture;
-        try {
-          // 隠した状態が画に出るまで 1 フレーム待つ。
-          await new Promise((resolve) => {
-            map.once('render', () => resolve(undefined));
-            map.triggerRepaint();
-          });
-          capture = captureMap(map);
-        } finally {
-          setDetectionMasked(false);
-        }
-
-        const vertices = await detectOutline(map, capture, point);
+        const vertices = await detectOutline(map, snapshot.whole(), point);
         if (token !== detectionToken) return;
 
         acceptOutline(vertices);
@@ -497,9 +479,8 @@ export function startApp(): void {
       commitEditing();
       preview.clear();
       setTool('manual', false);
+      // load は確定した状態を知らせてくるので、その場で item が 1 つできる。
       editor.load('polygon', vertices, defaultColor('paddy'));
-      edit = { ...edit, phase: 'editing' };
-      syncEditingItem(true);
     }
 
     /**
@@ -522,11 +503,13 @@ export function startApp(): void {
           map.setLayoutProperty(id, 'visibility', masked ? 'none' : 'visible');
         }
       }
-      for (const id of OVERLAY_LAYER_IDS) {
-        if (map.getLayer(id) === undefined) continue;
-        // 出していない地図は元から none なので、設定を見て戻す。
-        const on = settings.overlays[id.replace('overlay-', '') as keyof Settings['overlays']].on;
-        map.setLayoutProperty(id, 'visibility', masked ? 'none' : on ? 'visible' : 'none');
+      if (masked) {
+        for (const id of OVERLAY_LAYER_IDS) {
+          if (map.getLayer(id) !== undefined) map.setLayoutProperty(id, 'visibility', 'none');
+        }
+      } else {
+        // 出す・出さないは設定が持っている。ID から引き直さない。
+        applyOverlaySettings(map, settings);
       }
     }
 
@@ -665,11 +648,9 @@ export function startApp(): void {
 
     applyOverlaySettings(map, settings);
     items = loadStored();
-    ready = true;
     listDirty = true;
     wired = true;
     setMode('view');
     void refreshOfflineStatus();
-    void settingsSheet;
   }
 }

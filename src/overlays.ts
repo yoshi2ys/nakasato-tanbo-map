@@ -11,8 +11,6 @@ import { cachedTileUrl, type TileSource } from './tileCache';
 
 export type OverlayId = 'std' | 'pale' | 'hillshade';
 
-export const OVERLAY_IDS: OverlayId[] = ['std', 'pale', 'hillshade'];
-
 export interface OverlayDefinition {
   id: OverlayId;
   label: string;
@@ -45,16 +43,15 @@ export const OVERLAYS: OverlayDefinition[] = [
 
 const TILE_SIZE = 256;
 
-export function overlaySourceId(id: OverlayId): string {
-  return `overlay-${id}`;
-}
-
+/** ソースとレイヤーで同じ ID を使う。1 対 1 なので分ける意味がない。 */
 export function overlayLayerId(id: OverlayId): string {
   return `overlay-${id}`;
 }
 
+export const OVERLAY_IDS: OverlayId[] = OVERLAYS.map((overlay) => overlay.id);
+
 /** 重ねる地図のレイヤー ID（下から順）。自動検出のときはまとめて隠す。 */
-export const OVERLAY_LAYER_IDS = OVERLAYS.map((overlay) => overlayLayerId(overlay.id));
+export const OVERLAY_LAYER_IDS = OVERLAY_IDS.map((id) => overlayLayerId(id));
 
 /**
  * 写真の上、描いたものの下に 3 枚とも置く。
@@ -63,7 +60,7 @@ export const OVERLAY_LAYER_IDS = OVERLAYS.map((overlay) => overlayLayerId(overla
  */
 export function addOverlayLayers(map: MapLibreMap, beforeId?: string): void {
   for (const overlay of OVERLAYS) {
-    map.addSource(overlaySourceId(overlay.id), {
+    map.addSource(overlayLayerId(overlay.id), {
       type: 'raster',
       tiles: [cachedTileUrl(overlay.url)],
       tileSize: TILE_SIZE,
@@ -73,7 +70,7 @@ export function addOverlayLayers(map: MapLibreMap, beforeId?: string): void {
       {
         id: overlayLayerId(overlay.id),
         type: 'raster',
-        source: overlaySourceId(overlay.id),
+        source: overlayLayerId(overlay.id),
         layout: { visibility: 'none' },
         paint: { 'raster-opacity': 0.5 },
       },

@@ -20,7 +20,6 @@ export type Detection =
   | { status: 'failed'; message: string };
 
 export interface HintInput {
-  ready: boolean;
   mode: AppMode;
   tool: Tool;
   edit: EditState;
@@ -51,7 +50,6 @@ function measureHint(edit: EditState): string {
 }
 
 export function hintText(input: HintInput): string {
-  if (!input.ready) return '読み込み中…';
   if (input.detection.status === 'running') return '検出中…';
   if (input.detection.status === 'failed') return input.detection.message;
   if (input.notice !== null) return input.notice;

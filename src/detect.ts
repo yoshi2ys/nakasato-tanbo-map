@@ -105,37 +105,6 @@ function cameraKey(map: MapLibreMap): string {
   return [center.lng, center.lat, map.getZoom(), canvas.width, canvas.height].join('/');
 }
 
-/**
- * 地図の描画結果を読み出す。
- * MapLibre は既定で描画バッファを破棄するので、map.ts で preserveDrawingBuffer を有効にしてある。
- * WebGL の canvas からは 2D コンテキストを取れないため、いったん別の canvas に写す。
- */
-function captureMap(map: MapLibreMap): Capture {
-  const source = map.getCanvas();
-  const scale = source.width / source.clientWidth;
-  const { width, height } = source;
-
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-
-  const context = canvas.getContext('2d');
-  if (context === null) throw new DetectionError('canvas を用意できませんでした');
-
-  context.drawImage(source, 0, 0);
-  // MapLibre のズームは 512px タイル基準なので、CSS ピクセルの分解能は 2^(zoom+1) で割る。
-  const metersPerCssPixel =
-    (156543.03392 * Math.cos((map.getCenter().lat * Math.PI) / 180)) / 2 ** (map.getZoom() + 1);
-  return {
-    imageData: context.getImageData(0, 0, width, height),
-    scale,
-    metersPerPixel: metersPerCssPixel / scale,
-    camera: cameraKey(map),
-    origin: { x: 0, y: 0 },
-    framePixels: width * height,
-  };
-}
-
 function clampInt(value: number, max: number): number {
   return Math.min(Math.max(Math.round(value), 0), max);
 }
@@ -182,20 +151,27 @@ export class MapSnapshot {
     return new MapSnapshot(canvas, context, scale, metersPerCssPixel / scale, cameraKey(map));
   }
 
+  /** 画面ぜんぶ。クリックでの一発検出はこちらを使う。 */
+  whole(): Capture {
+    return this.#crop(0, 0, this.#canvas.width, this.#canvas.height);
+  }
+
   /** カーソルのまわりだけを切り出す。 */
   region(center: Point, sizePixels: number): Capture {
     const size = Math.round(sizePixels * this.#scale);
     const left = clampInt(Math.round(center.x * this.#scale) - size / 2, this.#canvas.width - 1);
     const top = clampInt(Math.round(center.y * this.#scale) - size / 2, this.#canvas.height - 1);
-    const width = Math.min(size, this.#canvas.width - left);
-    const height = Math.min(size, this.#canvas.height - top);
+    return this.#crop(left, top, Math.min(size, this.#canvas.width - left), Math.min(size, this.#canvas.height - top));
+  }
 
+  #crop(left: number, top: number, width: number, height: number): Capture {
     return {
       imageData: this.#context.getImageData(left, top, width, height),
       scale: this.#scale,
       metersPerPixel: this.#metersPerPixel,
       camera: this.camera,
       origin: { x: left, y: top },
+      // 面積比の分母は、切り出しても画面ぜんぶのまま。
       framePixels: this.#canvas.width * this.#canvas.height,
     };
   }
@@ -399,5 +375,27 @@ function touchesEdge(contour: Mat, cols: number, rows: number): boolean {
   return false;
 }
 
-export { captureMap };
+/**
+ * 描いたものを隠してから 1 枚撮る。
+ *
+ * タイルを待つのは隠す前。隠したまま待つと、そのあいだ描いたものが消えて見える。
+ * 隠した状態が画に出るまで 1 フレーム待たないと、隠す前の絵を撮ってしまう。
+ */
+export async function captureMasked(
+  map: MapLibreMap,
+  mask: (masked: boolean) => void
+): Promise<MapSnapshot> {
+  await waitForIdle(map);
+  mask(true);
+  try {
+    await new Promise((resolve) => {
+      map.once('render', () => resolve(undefined));
+      map.triggerRepaint();
+    });
+    return MapSnapshot.take(map);
+  } finally {
+    mask(false);
+  }
+}
+
 export type { Capture };

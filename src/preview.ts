@@ -1,6 +1,6 @@
 import type { FeatureCollection } from 'geojson';
 import { GeoJSONSource, type Map as MapLibreMap, type Point } from 'maplibre-gl';
-import { cameraKey, detectOutline, MapSnapshot, waitForIdle, type Capture } from './detect';
+import { cameraKey, captureMasked, detectOutline, MapSnapshot, type Capture } from './detect';
 import { toRing, type Vertex } from './geometry';
 
 const SOURCE_ID = 'tanbo-preview';
@@ -81,15 +81,6 @@ export class DetectPreview {
     this.#source.setData(EMPTY);
   }
 
-  destroy(): void {
-    this.clear();
-    this.#map.off('move', this.#handleMove);
-    for (const id of [PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID]) {
-      if (this.#map.getLayer(id) !== undefined) this.#map.removeLayer(id);
-    }
-    if (this.#map.getSource(SOURCE_ID) !== undefined) this.#map.removeSource(SOURCE_ID);
-  }
-
   /** 撮影を捨てる合図。地図が動けば写真も変わる。 */
   #handleMove = (): void => {
     this.#snapshot = null;
@@ -155,21 +146,8 @@ export class DetectPreview {
     const current = this.#snapshot;
     if (current !== null && current.camera === cameraKey(this.#map)) return current;
 
-    // タイルを待つのは隠す前。隠したまま何秒も待つと、そのあいだ描いたものが消えて見える。
-    await waitForIdle(this.#map);
-
-    this.#mask(true);
-    try {
-      // 隠した状態が画に出るまで 1 フレーム待つ。待たないと隠す前の絵を撮ってしまう。
-      await new Promise((resolve) => {
-        this.#map.once('render', () => resolve(undefined));
-        this.#map.triggerRepaint();
-      });
-      this.#snapshot = MapSnapshot.take(this.#map);
-      return this.#snapshot;
-    } finally {
-      this.#mask(false);
-    }
+    this.#snapshot = await captureMasked(this.#map, this.#mask);
+    return this.#snapshot;
   }
 
   #addLayers(beforeId?: string): GeoJSONSource {

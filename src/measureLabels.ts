@@ -34,11 +34,6 @@ export class MeasureLabels {
     this.setLine([]);
   }
 
-  destroy(): void {
-    this.#map.off('zoomend', this.#handleZoomEnd);
-    this.clear();
-  }
-
   #handleZoomEnd = (): void => {
     this.#render();
   };

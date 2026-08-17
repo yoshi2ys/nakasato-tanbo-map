@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, Geometry, Position } from 'geojson';
+import { isIconName, type IconName } from './icons';
 import {
   isSelfIntersecting,
   lineLength,
@@ -19,8 +20,6 @@ import {
 const STORAGE_KEY = 'tanbo-map.paddies';
 
 export type ItemKind = 'paddy' | 'measure' | 'pin';
-
-export type IconName = string;
 
 export interface Item {
   id: string;
@@ -44,11 +43,16 @@ const DEFAULT_COLORS: Record<ItemKind, string> = {
   pin: '#0071e3',
 };
 
-const NAME_PREFIX: Record<ItemKind, string> = {
+/** 種類の呼び名。名前の頭にも、インスペクタの見出しにも使う。 */
+const KIND_LABEL: Record<ItemKind, string> = {
   paddy: '田んぼ',
   measure: '計測',
   pin: 'ピン',
 };
+
+export function kindLabel(kind: ItemKind): string {
+  return KIND_LABEL[kind];
+}
 
 const MIN_VERTICES: Record<ItemKind, number> = { paddy: 3, measure: 2, pin: 1 };
 
@@ -91,7 +95,7 @@ export function isItemReliable(item: Item): boolean {
 export function nextName(items: Item[], kind: ItemKind): string {
   const used = new Set(items.map((item) => item.name));
   for (let number = 1; ; number += 1) {
-    const name = `${NAME_PREFIX[kind]} ${number}`;
+    const name = `${KIND_LABEL[kind]} ${number}`;
     if (!used.has(name)) return name;
   }
 }
@@ -302,9 +306,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
         color: readColor(properties['color'], shape.kind),
         // 保存されていなければ出す。隠されたまま戻ってくるより、出ているほうが気づける。
         visible: properties['visible'] !== false,
-        ...(shape.kind === 'pin'
-          ? { icon: typeof icon === 'string' && icon !== '' ? icon : DEFAULT_ICON }
-          : {}),
+        ...(shape.kind === 'pin' ? { icon: isIconName(icon) ? icon : DEFAULT_ICON } : {}),
         vertices: shape.vertices,
       });
     }

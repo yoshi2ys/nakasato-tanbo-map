@@ -23,8 +23,13 @@ const DEFAULT_OPACITY: Record<OverlayId, number> = {
 };
 
 export function defaultSettings(): Settings {
+  return build(() => undefined);
+}
+
+/** 保存されている値（無ければ既定）から組み立てる。 */
+function build(read: (id: OverlayId) => unknown): Settings {
   const overlays = {} as Record<OverlayId, OverlaySetting>;
-  for (const id of OVERLAY_IDS) overlays[id] = { on: false, opacity: DEFAULT_OPACITY[id] };
+  for (const id of OVERLAY_IDS) overlays[id] = readOverlay(read(id), id);
   return { overlays };
 }
 
@@ -47,9 +52,7 @@ export function loadSettings(): Settings {
 
   try {
     const parsed = JSON.parse(text) as { overlays?: Record<string, unknown> };
-    const overlays = {} as Record<OverlayId, OverlaySetting>;
-    for (const id of OVERLAY_IDS) overlays[id] = readOverlay(parsed?.overlays?.[id], id);
-    return { overlays };
+    return build((id) => parsed?.overlays?.[id]);
   } catch {
     // 壊れた設定で起動できなくなるより、既定で始めるほうがまし。
     return defaultSettings();
