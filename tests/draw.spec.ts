@@ -41,21 +41,38 @@ test.describe('手動でポリゴンを描く', () => {
     await expect(hint(page)).toHaveText('クリックで頂点を追加');
   });
 
-  test('パネルは地図のクリック位置を覆わない', async ({ page }) => {
-    const right = async (): Promise<number> =>
-      page.evaluate(() => document.getElementById('panel')?.getBoundingClientRect().right ?? 0);
+  test('パネルは地図の一角に収まり、その下は地図のまま', async ({ page }) => {
+    const box = async () =>
+      page.evaluate(() => {
+        const panel = document.getElementById('panel');
+        if (panel === null || panel.hidden) return null;
+        const { left, bottom, width } = panel.getBoundingClientRect();
+        return { left, bottom, width };
+      });
 
-    // パネルは左上に浮いている。中身が増えて横に広がると、そのぶんの地図が押しやられる
-    // のではなく覆われ、クリックが地図に届かなくなる（頂点が黙って落ちる）。
-    expect(await right()).toBeLessThan(290);
+    // 何も出ていないうちは地図が全部見えている。
+    expect(await box()).toBeNull();
 
-    // 一覧とオフラインの数字が入ると中身が増える。広がるのはそのあとなので、そこまで見る。
     await drawPolygon(page, [
       [400, 300],
       [500, 300],
       [500, 400],
     ]);
-    expect(await right()).toBeLessThan(290);
+
+    // 中身が増えても右上の一角から出ない。広がったぶんの地図は押しやられず覆われる。
+    const shown = (await box())!;
+    expect(shown.width).toBeLessThan(240);
+    expect(shown.left).toBeGreaterThan(1100);
+    expect(shown.bottom).toBeLessThan(280);
+
+    // パネルのすぐ下は地図のまま。覆われていれば、ここに置いた頂点は黙って落ちる。
+    await startNew(page);
+    await drawPolygon(page, [
+      [shown.left + 20, shown.bottom + 30],
+      [shown.left + 120, shown.bottom + 30],
+      [shown.left + 120, shown.bottom + 130],
+    ]);
+    expect(await areaSquareMeters(page)).toBe(Number(TRIANGLE_100PX.replace(',', '')));
   });
 
   test('描いた輪郭が地図にも出る', async ({ page }) => {

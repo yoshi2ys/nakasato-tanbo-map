@@ -47,19 +47,18 @@ test.describe('表示と編集を行き来する', () => {
 
     // 表示に移っても選んでいたものはそのまま。何を見ているかを見失わせない。
     await setMode(page, 'view');
-    await expect(page.locator('#inspector-body')).toBeVisible();
+    await expect(page.locator('#panel')).toBeVisible();
 
-    // 何もないところを押すと選択が外れ、インスペクタは空になる（列そのものは残る）。
+    // 何もないところを押すと選択が外れ、パネルごと引っ込む。
     await clickMap(page, 1300, 700);
     await page.waitForTimeout(300);
-    await expect(page.locator('#inspector-body')).toBeHidden();
-    await expect(page.locator('#inspector-empty')).toBeVisible();
+    await expect(page.locator('#panel')).toBeHidden();
 
     // 塗りの内側をクリックすると、その田んぼが選ばれる。
     await clickMap(page, 660, 320);
     await page.waitForTimeout(300);
     expect((await itemRows(page))[0]?.selected).toBe(true);
-    await expect(page.locator('#inspector-body')).toBeVisible();
+    await expect(page.locator('#panel')).toBeVisible();
   });
 
   test('道具を切り替えると、描いていたものはそこで確定する', async ({ page }) => {

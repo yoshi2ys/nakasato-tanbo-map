@@ -26,7 +26,8 @@ import { loadSettings, storeSettings, TEXT_SCALE_FACTOR, type Settings } from '.
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
 import { iconSvg } from './icons';
 import { element, isTyping, setIcon } from './ui/dom';
-import { Inspector } from './ui/inspector';
+import { DetailSheet } from './ui/detailSheet';
+import { Panel } from './ui/panel';
 import { Sidebar } from './ui/sidebar';
 import { SettingsSheet } from './ui/settingsSheet';
 
@@ -68,7 +69,7 @@ const EMPTY_EDIT: EditState = {
  * 画面全体の状態と配線。
  *
  * 表示（view）と編集（edit）の 2 つのモードがあり、編集のときだけ上のツールバーが出る。
- * 選んでいるものは右のインスペクタに出て、名前・色・アイコンをそこで変える。
+ * 選んでいるものは地図の右上のパネルに出て、名前・色・アイコンは「詳細」のシートで変える。
  */
 export function startApp(): void {
   const hint = element('hint');
@@ -129,7 +130,7 @@ export function startApp(): void {
   let listDirty = true;
   /**
    * 組み立てが済むまで描画しない。編集器は作られた時点で 1 回状態を知らせてくるので、
-   * その時点ではまだ一覧もインスペクタも存在しない。
+   * その時点ではまだ一覧もパネルも存在しない。
    */
   let wired = false;
 
@@ -155,18 +156,21 @@ export function startApp(): void {
       onToggleVisible: (id) => toggleVisible(id),
       onDelete: (id) => removeItem(id),
     });
-    const inspector = new Inspector({
+    const detail = new DetailSheet({
       onRename: (id, name) => updateItem(id, (item) => ({ ...item, name })),
       onRecolor: (id, color) => {
         updateItem(id, (item) => ({ ...item, color }));
         if (id === editingId) editor.setColor(color);
       },
       onIcon: (id, icon) => updateItem(id, (item) => ({ ...item, icon })),
+      onDelete: (id) => removeItem(id),
+    });
+    const panel = new Panel({
+      onDetail: () => detail.open(),
       onEdit: (id) => {
         setMode('edit');
         selectItem(id);
       },
-      onDelete: (id) => removeItem(id),
       onClose: () => {
         selectedId = null;
         listDirty = true;
@@ -357,7 +361,13 @@ export function startApp(): void {
 
     function setTool(next: Tool, restart = true): void {
       // 同じ道具を押し直したときも、いま描いているものは手放す（それが「次を描く」の合図）。
-      if (restart) commitEditing();
+      if (restart) {
+        commitEditing();
+        // 次を描き始めた時点で、前に選んでいたものからは離れている。
+        // 残すと、描いている最中もパネルが前のものを出し続ける。
+        selectedId = null;
+        listDirty = true;
+      }
       tool = next;
       for (const input of toolInputs) input.checked = input.value === next;
 
@@ -431,11 +441,12 @@ export function startApp(): void {
       }
       // 確定前でも面積と長さは見たい。名前や色はまだ無いので、数値だけ出す。
       if (selected === null && edit.vertexCount > 0) {
-        inspector.renderDraft(edit.areaSquareMeters, edit.totalMeters);
+        panel.renderDraft(edit.areaSquareMeters, edit.totalMeters);
       } else {
-        inspector.render(selected, selected !== null && selected.id === editingId);
+        panel.render(selected, selected !== null && selected.id === editingId);
       }
-      app.classList.toggle('has-selection', selected !== null);
+      // 選択が外れたら詳細のシートも閉じる。宛先のない編集欄を残さない。
+      detail.render(selected);
       // キーボードも右クリックもない端末のために、同じことをボタンでもできるようにする。
       const editing = mode === 'edit' && tool !== 'auto';
       finishButton.hidden = !(editing && edit.phase === 'drawing' && canFinishNow());

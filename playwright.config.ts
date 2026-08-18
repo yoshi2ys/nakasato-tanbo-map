@@ -17,9 +17,9 @@ export default defineConfig({
   reporter: [['list']],
   use: {
     baseURL: `http://localhost:${port}${BASE}`,
-    // 左の一覧 260px と右のインスペクタ 280px を足した幅。地図そのものは以前と同じ
-    // 1200×800 になり、シードの座標は地図の中の位置で決めてある。
-    viewport: { width: 1740, height: 800 },
+    // 左の一覧 260px を足した幅。地図そのものは 1200×800 で、シードの座標は
+    // 地図の中の位置で決めてある。ここを変えると同じ座標が別の場所を指す。
+    viewport: { width: 1460, height: 800 },
     // 検出結果は表示中の画像から作るので、画面サイズと解像度は固定する。
     deviceScaleFactor: 1,
     trace: 'retain-on-failure',

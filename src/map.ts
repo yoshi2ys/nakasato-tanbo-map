@@ -157,9 +157,13 @@ export function createMap(container: HTMLElement): MapLibreMap {
 
   map.touchZoomRotate.disableRotation();
 
-  map.addControl(new AttributionControl({ compact: false }));
-  map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
+  /*
+   * ズームとコンパスは左下。右上は選んでいるものの情報パネルに譲る。
+   * 右下に置くと出典の帯を押し上げ、その帯が地図のクリックを広く奪う（実際に踏んだ）。
+   */
+  map.addControl(new NavigationControl({ showCompass: true, visualizePitch: false }), 'bottom-left');
   map.addControl(new ScaleControl({ unit: 'metric' }), 'bottom-left');
+  map.addControl(new AttributionControl({ compact: false }));
 
   return map;
 }

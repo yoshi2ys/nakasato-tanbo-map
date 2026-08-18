@@ -4,7 +4,7 @@ import { collectErrors, itemRows, openApp, openSettings } from './helpers';
 /**
  * 電話で開いたときの画面。
  *
- * 列を 3 つ並べる幅がないので、一覧とインスペクタは下から出るシートになる。
+ * 列を並べる幅がないので、一覧も選んだものの情報も下から出るシートになる。
  * 操作はすべて指で、頂点のドラッグも touch のまま届く（maplibre がタップだけ click に直す）。
  */
 test.use({ ...devices['iPhone 14 Pro'] });
@@ -90,7 +90,7 @@ test.describe('電話で使う', () => {
     await expect(tool).toContainText('手動範囲');
   });
 
-  test('タップで田んぼを描け、インスペクタが下から出る', async ({ page }) => {
+  test('タップで田んぼを描け、情報が下から出る', async ({ page }) => {
     await page.locator('#mode label:has(input[value="edit"])').tap();
     await page.waitForTimeout(300);
 
@@ -102,11 +102,12 @@ test.describe('電話で使う', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe('paddy');
 
-    // 選んでいるあいだはインスペクタが地図の下半分に出る。
-    const inspector = (await page.locator('#inspector').boundingBox())!;
+    // 選んでいるあいだは情報が地図の下から出る。右上に浮かべると地図が塞がる。
+    const panel = (await page.locator('#panel').boundingBox())!;
     const viewport = page.viewportSize()!;
-    expect(inspector.y).toBeLessThan(viewport.height);
-    await expect(page.locator('#inspector-body')).toBeVisible();
+    expect(panel.y).toBeLessThan(viewport.height);
+    expect(panel.y).toBeGreaterThan(viewport.height / 2);
+    await expect(page.locator('#panel')).toBeVisible();
   });
 
   test('指だけで計測を終えられる', async ({ page }) => {

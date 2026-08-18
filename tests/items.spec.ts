@@ -5,6 +5,7 @@ import {
   itemRows,
   mapPixels,
   openApp,
+  openDetail,
   selectRow,
   startEditing,
   startNew,
@@ -61,7 +62,8 @@ test.describe('一覧から名前・色・表示を変える', () => {
 
   test('名前と色を変えると、一覧と地図と保存に載る', async ({ page }) => {
     await drawPolygon(page, SQUARE);
-    await page.locator('#inspector-name').fill('大屋敷の田んぼ');
+    await openDetail(page);
+    await page.locator('#detail-name').fill('大屋敷の田んぼ');
     await page.waitForTimeout(200);
     expect((await itemRows(page))[0]?.name).toBe('大屋敷の田んぼ');
 
@@ -79,14 +81,16 @@ test.describe('一覧から名前・色・表示を変える', () => {
 
     expect((await itemRows(page))[0]?.name).toBe('大屋敷の田んぼ');
     await selectRow(page, 0);
-    await expect(page.locator('#inspector-color')).toHaveValue('#43a047');
+    await openDetail(page);
+    await expect(page.locator('#detail-color')).toHaveValue('#43a047');
   });
 
   test('名前を打っているあいだの Backspace で頂点が減らない', async ({ page }) => {
     await drawPolygon(page, SQUARE);
     const before = (await itemRows(page))[0]?.value;
 
-    await page.locator('#inspector-name').click();
+    await openDetail(page);
+    await page.locator('#detail-name').click();
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
     await page.waitForTimeout(300);

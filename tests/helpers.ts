@@ -152,6 +152,33 @@ export async function openSettings(page: Page): Promise<void> {
   await page.waitForTimeout(250);
 }
 
+/** 設定のシートを閉じる。 */
+export async function closeSettings(page: Page): Promise<void> {
+  await page.locator('#settings-close').click();
+  await page.waitForTimeout(200);
+}
+
+/** 設定を開いて書き出し、落ちてきたファイルを保存する。 */
+export async function exportGeoJSON(page: Page, saveTo: string): Promise<void> {
+  await openSettings(page);
+  const download = page.waitForEvent('download');
+  await page.locator('#export').click();
+  await (await download).saveAs(saveTo);
+  await closeSettings(page);
+}
+
+/** 選んでいるものの詳細シートを開く。名前・色・アイコン・削除はこの中。 */
+export async function openDetail(page: Page): Promise<void> {
+  await page.locator('#panel-detail').click();
+  await page.waitForTimeout(250);
+}
+
+/** 詳細シートを閉じる。 */
+export async function closeDetail(page: Page): Promise<void> {
+  await page.locator('#detail-close').click();
+  await page.waitForTimeout(200);
+}
+
 /** 画素を数えるときの見方。田んぼの既定色（#ffb300）か、何か描かれているか。 */
 type PixelKind = 'drawn' | 'covered';
 

@@ -62,55 +62,67 @@
         </div>
 
         <p id="hint">読み込み中…</p>
-      </div>
 
-      <aside id="inspector">
-        <header id="inspector-header">
-          <h2 id="inspector-kind">選択なし</h2>
-          <button id="inspector-close" type="button" aria-label="閉じる"></button>
+        <!--
+          選んでいるものの情報。地図の右上に浮かせる。
+          出すのは読むためのものだけで、名前・色・アイコン・削除は「詳細」のシートで扱う。
+        -->
+        <div id="panel" hidden>
+          <header id="panel-header">
+            <span id="panel-icon"></span>
+            <h2 id="panel-name">選択なし</h2>
+            <button id="panel-close" type="button" aria-label="閉じる"></button>
+          </header>
+
+          <!-- 数値と単位は必ず隣り合わせにする。離すと目で結び付けられない。 -->
+          <div id="area" hidden>
+            <p class="metric primary"><span id="area-square-meters"></span><span class="unit">㎡</span></p>
+            <p class="metric"><span id="area-tan"></span><span class="unit">反</span></p>
+            <p class="metric"><span id="area-se"></span><span class="unit">畝</span></p>
+          </div>
+
+          <div id="measure" hidden>
+            <p class="metric primary"><span id="measure-total"></span></p>
+          </div>
+
+          <p id="panel-position" hidden></p>
+
+          <div id="panel-actions">
+            <button id="panel-detail" type="button">詳細</button>
+            <button id="panel-edit" type="button">編集</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div id="detail" role="dialog" aria-modal="true" aria-labelledby="detail-heading" hidden>
+      <div id="detail-sheet">
+        <header id="detail-header">
+          <h2 id="detail-heading">詳細</h2>
+          <button id="detail-close" type="button" aria-label="閉じる"></button>
         </header>
 
-        <p id="inspector-empty">一覧か地図から選ぶと、名前や面積がここに出ます。</p>
-
-        <div id="inspector-body" hidden>
-
-        <label class="field" id="inspector-name-field">
+        <label class="field">
           <span>名前</span>
-          <input id="inspector-name" type="text" />
+          <input id="detail-name" type="text" />
         </label>
 
-        <div class="field" id="inspector-color-field">
+        <div class="field">
           <span>色</span>
-          <div id="inspector-colors">
-            <input id="inspector-color" type="color" aria-label="色" />
-            <div id="inspector-swatches"></div>
+          <div id="detail-colors">
+            <input id="detail-color" type="color" aria-label="色" />
+            <div id="detail-swatches"></div>
           </div>
         </div>
 
-        <div class="field" id="inspector-icon-field" hidden>
+        <div class="field" id="detail-icon-field" hidden>
           <span>アイコン</span>
-          <div id="inspector-icons"></div>
+          <div id="detail-icons"></div>
         </div>
 
-        <!-- 数値と単位は必ず隣り合わせにする。離すと目で結び付けられない。 -->
-        <div id="area" hidden>
-          <p class="metric primary"><span id="area-square-meters"></span><span class="unit">㎡</span></p>
-          <p class="metric"><span id="area-tan"></span><span class="unit">反</span></p>
-          <p class="metric"><span id="area-se"></span><span class="unit">畝</span></p>
-        </div>
-
-        <div id="measure" hidden>
-          <p class="metric primary"><span id="measure-total"></span></p>
-        </div>
-
-        <p id="inspector-position" hidden></p>
-
-          <div id="inspector-actions">
-            <button id="inspector-edit" type="button">この項目を編集</button>
-            <button id="inspector-delete" type="button">削除</button>
-          </div>
-        </div>
-      </aside>
+        <button id="detail-delete" type="button">削除</button>
+      </div>
     </div>
 
     <div id="settings" role="dialog" aria-modal="true" aria-labelledby="settings-heading" hidden>

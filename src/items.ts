@@ -58,6 +58,18 @@ const MIN_VERTICES: Record<ItemKind, number> = { paddy: 3, measure: 2, pin: 1 };
 
 export const DEFAULT_ICON: IconName = 'location_on';
 
+/** 種類ごとの記号。ピンは選んだアイコンをそのまま使う。 */
+const KIND_ICON: Record<ItemKind, IconName> = {
+  paddy: 'crop_free',
+  measure: 'straighten',
+  pin: DEFAULT_ICON,
+};
+
+/** 一覧の行にもパネルの見出しにも、同じ記号を出す。 */
+export function itemIcon(item: Item): IconName {
+  return item.kind === 'pin' ? (item.icon ?? DEFAULT_ICON) : KIND_ICON[item.kind];
+}
+
 export function defaultColor(kind: ItemKind): string {
   return DEFAULT_COLORS[kind];
 }

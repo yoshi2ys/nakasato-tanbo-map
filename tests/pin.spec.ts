@@ -1,9 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
   clickMap,
+  closeDetail,
   collectErrors,
   itemRows,
   openApp,
+  openDetail,
   selectRow,
   setMode,
   startEditing,
@@ -36,15 +38,16 @@ test.describe('ピンを立てる', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.kind).toBe('pin');
     expect(rows[0]?.name).toBe('ピン 1');
-    // 緯度経度がインスペクタに出る。
-    await expect(page.locator('#inspector-position')).toBeVisible();
+    // 緯度経度がパネルに出る。
+    await expect(page.locator('#panel-position')).toBeVisible();
   });
 
   test('名前・色・アイコンを変えられる', async ({ page }) => {
     await clickMap(page, 700, 300);
     await page.waitForTimeout(300);
 
-    await page.locator('#inspector-name').fill('水口');
+    await openDetail(page);
+    await page.locator('#detail-name').fill('水口');
     await page.locator('.swatch[data-color="#00acc1"]').click();
     await page.locator('.icon-choice[data-icon="water_drop"]').click();
     await page.waitForTimeout(300);
@@ -57,7 +60,7 @@ test.describe('ピンを立てる', () => {
   test('編集中のピンはドラッグで動かせる', async ({ page }) => {
     await clickMap(page, 700, 300);
     await page.waitForTimeout(300);
-    const before = await page.locator('#inspector-position').innerText();
+    const before = await page.locator('#panel-position').innerText();
 
     await page.mouse.move(700, 300);
     await page.mouse.down();
@@ -65,13 +68,15 @@ test.describe('ピンを立てる', () => {
     await page.mouse.up();
     await page.waitForTimeout(400);
 
-    expect(await page.locator('#inspector-position').innerText()).not.toBe(before);
+    expect(await page.locator('#panel-position').innerText()).not.toBe(before);
   });
 
   test('ピンは再読み込みしても残り、表示から選べる', async ({ page }) => {
     await clickMap(page, 700, 300);
     await page.waitForTimeout(300);
-    await page.locator('#inspector-name').fill('出入口');
+    await openDetail(page);
+    await page.locator('#detail-name').fill('出入口');
+    await closeDetail(page);
     await startNew(page, 'pin');
     await clickMap(page, 950, 500);
     await page.waitForTimeout(700);
