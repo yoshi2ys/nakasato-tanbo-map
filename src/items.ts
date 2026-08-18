@@ -33,6 +33,11 @@ export interface Item {
   icon?: IconName;
   /** 一覧でまとめる先。未設定は「未分類」。入れ子は作らない。 */
   group?: string;
+  /**
+   * グループの中で手で並べたときの位置。持っていないものは名前順で後ろに続く。
+   * 並べ替えたグループだけが番号を持つので、触っていないグループは名前順のまま。
+   */
+  order?: number;
   /** paddy: 閉じないリング（3 点以上）/ measure: 折れ線（2 点以上）/ pin: 1 点。 */
   vertices: Vertex[];
 }
@@ -57,6 +62,17 @@ const collator = new Intl.Collator('ja', { numeric: true, sensitivity: 'base' })
 /** 名前順。同じ名前なら作った順のままにする（並びが毎回入れ替わらないように）。 */
 export function byName(a: Item, b: Item): number {
   return collator.compare(a.name, b.name);
+}
+
+/**
+ * 一覧の並び。手で並べたものが先、それ以外は名前順で後ろに続く。
+ * 並べ替えたグループだけが番号を持つので、触っていないグループは名前順のまま。
+ */
+export function byListOrder(a: Item, b: Item): number {
+  const left = a.order ?? Number.POSITIVE_INFINITY;
+  const right = b.order ?? Number.POSITIVE_INFINITY;
+  if (left !== right) return left - right;
+  return byName(a, b);
 }
 
 /** グループ名順。未分類は最後に置く。 */
@@ -208,6 +224,7 @@ export function toGeoJSON(items: Item[]): FeatureCollection {
           visible: item.visible,
           ...(item.icon === undefined ? {} : { icon: item.icon }),
           ...(item.group === undefined ? {} : { group: item.group }),
+          ...(item.order === undefined ? {} : { order: item.order }),
           // 交差した輪郭に面積を書くと、受け取った側は正しい数値だと思ってしまう。
           ...(areaSquareMeters === null
             ? {}
@@ -362,6 +379,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
     const icon = properties['icon'];
     // 「フォルダ」と呼んでいた頃に書き出したファイルも読めるようにしておく。
     const group = properties['group'] ?? properties['folder'];
+    const order = properties['order'];
     for (const [index, shape] of shapes.entries()) {
       // 同じ id が 2 つ並ぶと、1 つを消したつもりで両方消える。
       const wanted = typeof feature.id === 'string' && index === 0 ? feature.id : '';
@@ -377,6 +395,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
         visible: properties['visible'] !== false,
         ...(shape.kind === 'pin' ? { icon: isIconName(icon) ? icon : DEFAULT_ICON } : {}),
         ...(typeof group === 'string' && group.trim() !== '' ? { group: group.trim() } : {}),
+        ...(typeof order === 'number' && Number.isFinite(order) ? { order } : {}),
         vertices: shape.vertices,
       });
     }

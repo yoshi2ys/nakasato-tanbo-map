@@ -1,7 +1,7 @@
 import { iconSvg } from '../icons';
 import {
   byGroup,
-  byName,
+  byListOrder,
   groupOf,
   NO_GROUP,
   isItemReliable,
@@ -31,6 +31,8 @@ export interface SidebarCallbacks {
   /** 行をグループへ移す。未分類へ戻すときは空文字を渡す。 */
   onMoveToGroup: (id: string, group: string) => void;
   onRemoveGroup: (group: string) => void;
+  /** グループの中身を並べ直す。並んだ順の id を渡す（移してきた行も含む）。 */
+  onReorder: (group: string, orderedIds: string[]) => void;
 }
 
 /**
@@ -122,11 +124,11 @@ export class Sidebar {
     this.#list.replaceChildren(
       ...(flat
         ? [...shown]
-            .sort(byName)
+            .sort(byListOrder)
             .map((item) =>
               this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
             )
-        : names.map((group) => this.#group(group, [...groups.get(group)!].sort(byName))))
+        : names.map((group) => this.#group(group, [...groups.get(group)!].sort(byListOrder))))
     );
 
     this.#empty.hidden = shown.length > 0;
@@ -202,6 +204,18 @@ export class Sidebar {
     return block;
   }
 
+  /** 落とされた行を、相手の隣に入れた並びにして知らせる。 */
+  #reorder(draggedId: string, target: Item, before: boolean): void {
+    const group = groupOf(target);
+    const ids = this.#items
+      .filter((item) => groupOf(item) === group && item.id !== draggedId)
+      .sort(byListOrder)
+      .map((item) => item.id);
+    const at = ids.indexOf(target.id) + (before ? 0 : 1);
+    ids.splice(at, 0, draggedId);
+    this.#callbacks.onReorder(group, ids);
+  }
+
   #matches(item: Item): boolean {
     if (this.#kind !== 'all' && item.kind !== this.#kind) return false;
     if (this.#query === '') return true;
@@ -257,6 +271,31 @@ export class Sidebar {
       row.classList.add('dragging');
     });
     row.addEventListener('dragend', () => row.classList.remove('dragging'));
+    /*
+     * 行の上半分に落としたら前、下半分なら後ろ。掴んだ行がどこに入るのかを、
+     * 落とす前に線で見せる。指では掴めないので、これはマウスのある画面のための道。
+     */
+    row.addEventListener('dragover', (event) => {
+      if (event.dataTransfer === null) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      const box = row.getBoundingClientRect();
+      const before = event.clientY < box.top + box.height / 2;
+      row.classList.toggle('drop-before', before);
+      row.classList.toggle('drop-after', !before);
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drop-before', 'drop-after');
+    });
+    row.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const box = row.getBoundingClientRect();
+      const before = event.clientY < box.top + box.height / 2;
+      row.classList.remove('drop-before', 'drop-after');
+      const dragged = event.dataTransfer?.getData('text/plain') ?? '';
+      if (dragged === '' || dragged === item.id) return;
+      this.#reorder(dragged, item, before);
+    });
 
     const select = document.createElement('button');
     select.type = 'button';

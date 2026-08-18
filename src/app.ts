@@ -14,6 +14,7 @@ import {
   ImportError,
   defaultColor,
   groupNames,
+  NO_GROUP,
   fromGeoJSON,
   loadStored,
   merge,
@@ -184,6 +185,18 @@ export function startApp(): void {
       onDelete: (id) => removeItem(id),
       onMoveToGroup: (id, group) => {
         updateItem(id, (item) => ({ ...item, group: group === '' ? undefined : group }));
+      },
+      onReorder: (group, orderedIds) => {
+        // 並べ直したグループだけに番号を振る。触っていないグループは名前順のまま。
+        const positions = new Map(orderedIds.map((id, at) => [id, at]));
+        items = items.map((item) => {
+          const at = positions.get(item.id);
+          if (at === undefined) return item;
+          return { ...item, group: group === NO_GROUP ? undefined : group, order: at };
+        });
+        listDirty = true;
+        scheduleStore();
+        render();
       },
       onRemoveGroup: (group) => {
         settings = {

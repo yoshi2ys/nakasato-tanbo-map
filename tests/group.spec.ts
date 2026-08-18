@@ -149,6 +149,33 @@ test.describe('一覧をグループでまとめる', () => {
     await expect(page.locator('.group-name')).toHaveText(['大屋敷', '未分類']);
   });
 
+  test('グループの中を手で並べ替えられる', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await page.locator('#detail-name').fill('い');
+    await startNew(page);
+    await drawPolygon(page, OTHER);
+    await page.locator('#detail-name').fill('あ');
+    await page.waitForTimeout(400);
+
+    // 名前順なら「あ」が先。手で並べ替えたら、その並びが残る。
+    expect((await itemRows(page)).map((row) => row.name)).toEqual(['あ', 'い']);
+
+    await page.dragAndDrop(
+      '#items li.item-row:has-text("い")',
+      '#items li.item-row:has-text("あ")',
+      { targetPosition: { x: 40, y: 2 } }
+    );
+    await page.waitForTimeout(400);
+    expect((await itemRows(page)).map((row) => row.name)).toEqual(['い', 'あ']);
+
+    // 並びは保存にも残る。
+    await page.waitForTimeout(600);
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('#mode input[value="edit"]')).toBeEnabled({ timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    expect((await itemRows(page)).map((row) => row.name)).toEqual(['い', 'あ']);
+  });
+
   test('名前順に並べる。数字は数として比べる', async ({ page }) => {
     // 「田んぼ 10」を先に作っても、「田んぼ 2」より後ろに来る。
     await drawPolygon(page, SQUARE);

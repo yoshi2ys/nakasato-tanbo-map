@@ -245,6 +245,15 @@ button {
   opacity: 0.4;
 }
 
+/* 落ちる先を線で見せる。行の上半分なら上、下半分なら下。 */
+#items li.item-row.drop-before {
+  box-shadow: inset 0 2px 0 #0071e3;
+}
+
+#items li.item-row.drop-after {
+  box-shadow: inset 0 -2px 0 #0071e3;
+}
+
 .group-items {
   margin: 0;
   padding: 0 0 4px 10px;
