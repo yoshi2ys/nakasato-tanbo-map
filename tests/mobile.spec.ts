@@ -229,6 +229,7 @@ test.describe('電話で使う', () => {
       '#settings-open',
       '#item-search',
       '#kind-filters label',
+      '#group-add',
     ]) {
       await atLeast44(selector);
     }

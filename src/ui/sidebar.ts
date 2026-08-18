@@ -1,9 +1,9 @@
 import { iconSvg } from '../icons';
 import {
-  byFolder,
+  byGroup,
   byName,
-  folderOf,
-  NO_FOLDER,
+  groupOf,
+  NO_GROUP,
   isItemReliable,
   isLightColor,
   itemArea,
@@ -27,11 +27,14 @@ export interface SidebarCallbacks {
   onSelect: (id: string) => void;
   onToggleVisible: (id: string) => void;
   onDelete: (id: string) => void;
-  onToggleFolder: (folder: string) => void;
+  onToggleGroup: (group: string) => void;
+  /** 行をグループへ移す。未分類へ戻すときは空文字を渡す。 */
+  onMoveToGroup: (id: string, group: string) => void;
+  onRemoveGroup: (group: string) => void;
 }
 
 /**
- * 左の一覧。フォルダごとにまとめ、中は名前順に並べる。
+ * 左の一覧。グループごとにまとめ、中は名前順に並べる。
  *
  * 種類では分けない（「さっき作ったもの」が探しにくくなる）。見分けはアイコンに任せ、
  * 種類で絞りたいときは上の絞り込みを使う。
@@ -55,6 +58,8 @@ export class Sidebar {
   #selectedId: string | null = null;
   #editingId: string | null = null;
   #collapsed: string[] = [];
+  /** 中身が空でも出すグループ。設定に持っている「作ったグループ」。 */
+  #groups: string[] = [];
 
   constructor(callbacks: SidebarCallbacks) {
     this.#callbacks = callbacks;
@@ -69,12 +74,14 @@ export class Sidebar {
     items: Item[],
     selectedId: string | null,
     editingId: string | null,
-    collapsed: string[]
+    collapsed: string[],
+    groups: string[]
   ): void {
     this.#items = items;
     this.#selectedId = selectedId;
     this.#editingId = editingId;
     this.#collapsed = collapsed;
+    this.#groups = groups;
     this.#paint();
   }
 
@@ -93,23 +100,25 @@ export class Sidebar {
     this.#paint();
   }
 
-  /** 絞り込んだ結果を、フォルダごとに並べ直す。 */
+  /** 絞り込んだ結果を、グループごとに並べ直す。 */
   #paint(): void {
     this.#liveValue = null;
     this.#liveId = this.#editingId;
 
     const shown = this.#items.filter((item) => this.#matches(item));
-    const folders = new Map<string, Item[]>();
+    const groups = new Map<string, Item[]>();
     for (const item of shown) {
-      const folder = folderOf(item);
-      const group = folders.get(folder);
-      if (group === undefined) folders.set(folder, [item]);
+      const name = groupOf(item);
+      const group = groups.get(name);
+      if (group === undefined) groups.set(name, [item]);
       else group.push(item);
     }
 
-    const names = [...folders.keys()].sort(byFolder);
-    // フォルダを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても読む先が増えるだけ。
-    const flat = names.length === 1 && names[0] === NO_FOLDER;
+    // 作っただけでまだ空のグループも見出しを出す。入れる先が見えないと移しようがない。
+    for (const name of this.#groups) if (!groups.has(name)) groups.set(name, []);
+    const names = [...groups.keys()].sort(byGroup);
+    // グループを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても読む先が増えるだけ。
+    const flat = names.length === 1 && names[0] === NO_GROUP;
     this.#list.replaceChildren(
       ...(flat
         ? [...shown]
@@ -117,7 +126,7 @@ export class Sidebar {
             .map((item) =>
               this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
             )
-        : names.map((folder) => this.#folder(folder, [...folders.get(folder)!].sort(byName))))
+        : names.map((group) => this.#group(group, [...groups.get(group)!].sort(byName))))
     );
 
     this.#empty.hidden = shown.length > 0;
@@ -125,38 +134,64 @@ export class Sidebar {
     this.#empty.textContent = this.#items.length === 0 ? NOTHING_YET : NOTHING_MATCHED;
   }
 
-  /** フォルダ 1 つぶん。見出しを押すと畳める。 */
-  #folder(folder: string, items: Item[]): HTMLLIElement {
-    const collapsed = this.#collapsed.includes(folder);
+  /** グループ 1 つぶん。見出しを押すと畳める。 */
+  #group(group: string, items: Item[]): HTMLLIElement {
+    const collapsed = this.#collapsed.includes(group);
     const block = document.createElement('li');
-    block.className = 'folder';
-    block.dataset['folder'] = folder;
+    block.className = 'group';
+    block.dataset['group'] = group;
 
     const head = document.createElement('button');
     head.type = 'button';
-    head.className = 'folder-head';
+    head.className = 'group-head';
     head.setAttribute('aria-expanded', String(!collapsed));
-    head.addEventListener('click', () => this.#callbacks.onToggleFolder(folder));
+    head.addEventListener('click', () => this.#callbacks.onToggleGroup(group));
+
+    // 行をここへ落として移す。指では掴めないので、マウスのある画面のための道。
+    head.addEventListener('dragover', (event) => {
+      if (event.dataTransfer === null) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      head.classList.add('drop-target');
+    });
+    head.addEventListener('dragleave', () => head.classList.remove('drop-target'));
+    head.addEventListener('drop', (event) => {
+      event.preventDefault();
+      head.classList.remove('drop-target');
+      const id = event.dataTransfer?.getData('text/plain') ?? '';
+      if (id !== '') this.#callbacks.onMoveToGroup(id, group === NO_GROUP ? '' : group);
+    });
 
     const mark = document.createElement('span');
-    mark.className = 'folder-mark';
+    mark.className = 'group-mark';
     // 記号は字で出す。アイコンの一覧に矢印を足すより、向きが変わる字のほうが確か。
     mark.textContent = collapsed ? '▸' : '▾';
 
     const name = document.createElement('span');
-    name.className = 'folder-name';
-    name.textContent = folder;
+    name.className = 'group-name';
+    name.textContent = group;
 
     const count = document.createElement('span');
-    count.className = 'folder-count';
+    count.className = 'group-count';
     count.textContent = String(items.length);
 
     head.append(mark, name, count);
     block.append(head);
 
+    // 空になったグループだけ捨てられる。中身ごと消える削除は、押し間違いが痛い。
+    if (items.length === 0 && group !== NO_GROUP) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'group-remove';
+      remove.title = `${group} を消す`;
+      remove.append(iconSvg('close', 14));
+      remove.addEventListener('click', () => this.#callbacks.onRemoveGroup(group));
+      head.append(remove);
+    }
+
     if (!collapsed) {
       const list = document.createElement('ul');
-      list.className = 'folder-items';
+      list.className = 'group-items';
       list.append(
         ...items.map((item) =>
           this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
@@ -214,6 +249,14 @@ export class Sidebar {
     row.classList.toggle('selected', selected);
     row.dataset['id'] = item.id;
     row.dataset['kind'] = item.kind;
+    // 掴んでグループの見出しへ落とせる。touch には効かないので、指のときは詳細の欄を使う。
+    row.draggable = true;
+    row.addEventListener('dragstart', (event) => {
+      event.dataTransfer?.setData('text/plain', item.id);
+      if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
+      row.classList.add('dragging');
+    });
+    row.addEventListener('dragend', () => row.classList.remove('dragging'));
 
     const select = document.createElement('button');
     select.type = 'button';

@@ -13,7 +13,7 @@ import {
 import {
   ImportError,
   defaultColor,
-  folderNames,
+  groupNames,
   fromGeoJSON,
   loadStored,
   merge,
@@ -107,6 +107,7 @@ export function startApp(): void {
   const resetBearingButton = element<HTMLButtonElement>('reset-bearing');
   const panelFields = element('panel-fields');
   const imageOpenButton = element<HTMLButtonElement>('image-open');
+  const groupAddButton = element<HTMLButtonElement>('group-add');
   /** 幅の境目は CSS と同じ。ここを跨いだら、名前や色の欄の置き場所も変える。 */
   const narrowScreen = window.matchMedia('(max-width: 820px)');
   const app = element('app');
@@ -181,13 +182,26 @@ export function startApp(): void {
       onSelect: (id) => selectItem(id),
       onToggleVisible: (id) => toggleVisible(id),
       onDelete: (id) => removeItem(id),
-      onToggleFolder: (folder) => {
-        const collapsed = settings.collapsedFolders;
+      onMoveToGroup: (id, group) => {
+        updateItem(id, (item) => ({ ...item, group: group === '' ? undefined : group }));
+      },
+      onRemoveGroup: (group) => {
         settings = {
           ...settings,
-          collapsedFolders: collapsed.includes(folder)
-            ? collapsed.filter((name) => name !== folder)
-            : [...collapsed, folder],
+          groups: settings.groups.filter((name) => name !== group),
+          collapsedGroups: settings.collapsedGroups.filter((name) => name !== group),
+        };
+        storeSettings(settings);
+        listDirty = true;
+        render();
+      },
+      onToggleGroup: (group) => {
+        const collapsed = settings.collapsedGroups;
+        settings = {
+          ...settings,
+          collapsedGroups: collapsed.includes(group)
+            ? collapsed.filter((name) => name !== group)
+            : [...collapsed, group],
         };
         storeSettings(settings);
         listDirty = true;
@@ -196,9 +210,9 @@ export function startApp(): void {
     });
     const detail = new DetailSheet({
       onRename: (id, name) => updateItem(id, (item) => ({ ...item, name })),
-      onFolder: (id, folder) => {
-        const trimmed = folder.trim();
-        updateItem(id, (item) => ({ ...item, folder: trimmed === '' ? undefined : trimmed }));
+      onGroup: (id, group) => {
+        const trimmed = group.trim();
+        updateItem(id, (item) => ({ ...item, group: trimmed === '' ? undefined : trimmed }));
       },
       onRecolor: (id, color) => {
         updateItem(id, (item) => ({ ...item, color }));
@@ -508,7 +522,13 @@ export function startApp(): void {
 
       if (listDirty) {
         listDirty = false;
-        sidebar.render(items, selectedId, editingId, settings.collapsedFolders);
+        sidebar.render(
+          items,
+          selectedId,
+          editingId,
+          settings.collapsedGroups,
+          settings.groups
+        );
       } else {
         sidebar.refreshLive(items);
       }
@@ -524,7 +544,7 @@ export function startApp(): void {
         panel.render(selected, selected !== null && selected.id === editingId, inlineFields);
       }
       // 選択が外れたら詳細のシートも閉じる。宛先のない編集欄を残さない。
-      detail.render(selected, folderNames(items));
+      detail.render(selected, groupNames(items));
       // 画像にできるのは表示モードだけ。編集の道具と場所を取り合わせない。
       imageOpenButton.hidden = mode !== 'view' || crop.isOpen;
       // 枠を出しているあいだは、選んだものの情報も案内も引っ込める（写り込む）。
@@ -817,6 +837,21 @@ export function startApp(): void {
     // 見ているだけでもタイルはたまる。地図が落ち着くたびに、たまった量を出し直す。
     map.on('idle', () => {
       if (tileSaving === null) void refreshOfflineStatus();
+    });
+
+    // MARK: - グループ
+
+    groupAddButton.prepend(iconSvg('create_new_folder', 18));
+    groupAddButton.addEventListener('click', () => {
+      const name = prompt('グループの名前')?.trim();
+      if (name === undefined || name === '') return;
+      // 同じ名前を 2 つ作らない。すでにあるなら、その見出しがそのまま入れ先になる。
+      if (!settings.groups.includes(name)) {
+        settings = { ...settings, groups: [...settings.groups, name] };
+        storeSettings(settings);
+      }
+      listDirty = true;
+      render();
     });
 
     // MARK: - 画像にする

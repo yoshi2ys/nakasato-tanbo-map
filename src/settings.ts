@@ -30,8 +30,13 @@ export interface Settings {
   uiScale: TextScale;
   /** 地図に出る文字（計測の長さなど）。 */
   labelScale: TextScale;
-  /** 畳んである一覧のフォルダ名。畳んだままにしておけるよう、設定として残す。 */
-  collapsedFolders: string[];
+  /** 畳んである一覧のグループ名。畳んだままにしておけるよう、設定として残す。 */
+  collapsedGroups: string[];
+  /**
+   * 作ったグループの名前。中身が空でも見出しを出すために持つ。
+   * 田んぼのファイル（書き出す GeoJSON）には混ぜない——あちらは地図に置いたものだけ。
+   */
+  groups: string[];
 }
 
 const DEFAULT_OPACITY: Record<OverlayId, number> = {
@@ -51,7 +56,14 @@ function readScale(value: unknown): TextScale {
 /** 保存されている値（無ければ既定）から組み立てる。 */
 function build(
   read: (id: OverlayId) => unknown,
-  stored: { uiScale?: unknown; labelScale?: unknown; collapsedFolders?: unknown }
+  stored: {
+    uiScale?: unknown;
+    labelScale?: unknown;
+    collapsedGroups?: unknown;
+    collapsedFolders?: unknown;
+    groups?: unknown;
+    folders?: unknown;
+  }
 ): Settings {
   const overlays = {} as Record<OverlayId, OverlaySetting>;
   for (const id of OVERLAY_IDS) overlays[id] = readOverlay(read(id), id);
@@ -59,10 +71,15 @@ function build(
     overlays,
     uiScale: readScale(stored.uiScale),
     labelScale: readScale(stored.labelScale),
-    collapsedFolders: Array.isArray(stored.collapsedFolders)
-      ? stored.collapsedFolders.filter((name): name is string => typeof name === 'string')
-      : [],
+    // 「フォルダ」と呼んでいた頃の設定も拾う。作った名前を消さないため。
+    collapsedGroups: readNames(stored.collapsedGroups ?? stored.collapsedFolders),
+    groups: readNames(stored.groups ?? stored.folders),
   };
+}
+
+/** 文字列の配列だけを通す。壊れた設定で一覧が出なくなるより、空で始めるほうがまし。 */
+function readNames(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((name): name is string => typeof name === 'string') : [];
 }
 
 function readOverlay(value: unknown, id: OverlayId): OverlaySetting {
@@ -87,7 +104,10 @@ export function loadSettings(): Settings {
       overlays?: Record<string, unknown>;
       uiScale?: unknown;
       labelScale?: unknown;
+      collapsedGroups?: unknown;
       collapsedFolders?: unknown;
+      groups?: unknown;
+      folders?: unknown;
     };
     return build((id) => parsed?.overlays?.[id], parsed ?? {});
   } catch {

@@ -93,6 +93,29 @@ button {
   color: #1d1d1f;
 }
 
+/* グループを作る。中身が空でも見出しが出るので、先に器だけ用意できる。 */
+#list-tools {
+  display: flex;
+  margin-top: 8px;
+}
+
+#group-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  font-size: calc(11px * var(--ui-scale));
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#group-add:hover {
+  background: #f0f0f2;
+}
+
 /* 語で探すのと種別で絞るのは、どちらも一覧の見え方だけを変える。 */
 #list-filters {
   display: flex;
@@ -152,12 +175,12 @@ button {
   list-style: none;
 }
 
-/* フォルダの見出しと、その中の行。フォルダを使っていないうちは見出しごと出ない。 */
-.folder {
+/* グループの見出しと、その中の行。グループを使っていないうちは見出しごと出ない。 */
+.group {
   list-style: none;
 }
 
-.folder-head {
+.group-head {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -172,15 +195,15 @@ button {
   cursor: pointer;
 }
 
-.folder-head:hover {
+.group-head:hover {
   background: #f0f0f2;
 }
 
-.folder-mark {
+.group-mark {
   width: 10px;
 }
 
-.folder-name {
+.group-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -190,11 +213,39 @@ button {
   text-overflow: ellipsis;
 }
 
-.folder-count {
+.group-count {
   font-variant-numeric: tabular-nums;
 }
 
-.folder-items {
+/* 落とし先。掴んだ行が上に来たときだけ色を付ける。 */
+.group-head.drop-target {
+  background: #e8f4ff;
+  box-shadow: inset 0 0 0 1px #0071e3;
+}
+
+.group-remove {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: #86868b;
+  cursor: pointer;
+}
+
+.group-remove:hover {
+  color: #c8102e;
+}
+
+/* 掴んでいる行は薄くする。どれを動かしているのかを見失わない。 */
+#items li.item-row.dragging {
+  opacity: 0.4;
+}
+
+.group-items {
   margin: 0;
   padding: 0 0 4px 10px;
   list-style: none;
@@ -1384,7 +1435,12 @@ li.selected .item-name {
     min-height: 48px;
   }
 
-  .folder-head {
+  .group-head {
+    min-height: 44px;
+    font-size: calc(13px * var(--ui-scale));
+  }
+
+  #group-add {
     min-height: 44px;
     font-size: calc(13px * var(--ui-scale));
   }

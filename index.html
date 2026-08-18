@@ -23,6 +23,11 @@
         <ul id="items"></ul>
         <!-- 文言は sidebar.ts が入れる。まだ何も無いのか、絞り込みで消えたのかで変わる。 -->
         <p id="items-empty"></p>
+
+        <!-- 一覧の下。中身を見てから「まとめよう」と思うので、上より下のほうが手に近い。 -->
+        <div id="list-tools">
+          <button id="group-add" type="button"><span>グループを追加</span></button>
+        </div>
       </aside>
 
       <div id="stage">
@@ -143,10 +148,10 @@
           </label>
 
           <label class="field">
-            <span>フォルダ</span>
-            <input id="detail-folder" type="text" list="folder-names" placeholder="未分類" />
-            <!-- いま使われている名前を候補に出す。新しい名前を打てば、そのフォルダができる。 -->
-            <datalist id="folder-names"></datalist>
+            <span>グループ</span>
+            <input id="detail-group" type="text" list="group-names" placeholder="未分類" />
+            <!-- いま使われている名前を候補に出す。新しい名前を打てば、そのグループができる。 -->
+            <datalist id="group-names"></datalist>
           </label>
 
           <div class="field">
