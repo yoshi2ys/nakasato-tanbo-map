@@ -22,6 +22,12 @@ const SNAP_PIXELS = 12;
 const HIT_PIXELS = 9;
 /** 指で掴むときの距離。指先は矢印より太いので広く取る。 */
 const TOUCH_HIT_PIXELS = 20;
+/**
+ * 計測の破線。単位は線の太さなので、太さ 2px で 8px の線と 6px の空きになる。
+ * 田んぼの輪郭は実線のままにして、測った線とすぐ見分けられるようにする。
+ */
+export const MEASURE_DASH: [number, number] = [4, 3];
+
 /** 中点ゴーストを出す辺の最小の長さ（スクリーン座標 px）。 */
 const MIN_GHOST_EDGE_PIXELS = 32;
 
@@ -101,12 +107,23 @@ export class ItemEditor {
   #totalMeters: number | null = null;
   #selfIntersecting = false;
   #enabled = true;
+  readonly #onRestart: () => void;
   /** 予約済みの再描画フレーム。mousemove ごとの再構築を 1 フレームにまとめる。 */
   #pendingFrame: number | null = null;
 
-  constructor(map: MapLibreMap, onChange: (state: EditState) => void) {
+  /**
+   * @param onRestart 確定したものから離れて、次を描き始めたときに 1 回だけ呼ぶ。
+   *   状態の遷移だけでは、モードの切り替えで作り直したのか、ユーザーが次を描き始めたのかを
+   *   見分けられない（どちらも editing → drawing に見える）。
+   */
+  constructor(
+    map: MapLibreMap,
+    onChange: (state: EditState) => void,
+    onRestart: () => void = () => {}
+  ) {
     this.#map = map;
     this.#onChange = onChange;
+    this.#onRestart = onRestart;
     this.#source = this.#addLayers();
 
     this.#addInputListeners();
@@ -214,11 +231,21 @@ export class ItemEditor {
 
   #handleClick = (event: MapMouseEvent): void => {
     if (this.#phase === 'editing') {
-      // 頂点の外をクリックしたら選択を解除する。
       const hit = this.#hitTest(event.point);
-      this.#selected = hit?.role === 'vertex' ? hit.index : null;
-      this.#render();
-      return;
+      /*
+       * 形から離れたところを押したのは「この 1 本は終わり、次を描く」の合図。
+       * 道具を押し直させると、続けて何本も測るときに手が止まる。
+       * 点（ピン）は 1 回で決まるので、ここでは増やさない。
+       */
+      if (hit === null && this.#kind !== 'point') {
+        this.#onRestart();
+        this.begin(this.#kind, this.#color);
+      } else {
+        // 頂点の外をクリックしたら選択を解除する。
+        this.#selected = hit?.role === 'vertex' ? hit.index : null;
+        this.#render();
+        return;
+      }
     }
 
     // ダブルクリックの 2 回目は頂点追加ではなく確定の合図。
@@ -621,6 +648,12 @@ export class ItemEditor {
   #applyColor(): void {
     this.#map.setPaintProperty(EDIT_FILL_LAYER_ID, 'fill-color', this.#color);
     this.#map.setPaintProperty(EDIT_LINE_LAYER_ID, 'line-color', this.#color);
+    // 計測は破線。田んぼの輪郭（実線）と、測っている線をひと目で見分けられる。
+    this.#map.setPaintProperty(
+      EDIT_LINE_LAYER_ID,
+      'line-dasharray',
+      this.#kind === 'line' ? MEASURE_DASH : undefined
+    );
     this.#map.setPaintProperty(EDIT_VERTEX_LAYER_ID, 'circle-color', [
       'case',
       ['==', ['get', 'selected'], true],

@@ -3,7 +3,13 @@ import { DetectionError, captureMasked, cameraKey, detectOutline, loadOpenCV } f
 import { EDIT_FILL_LAYER_ID, ItemEditor, type EditKind, type EditState } from './editor';
 import type { Vertex } from './geometry';
 import { hintText, type AppMode, type Detection, type Tool } from './hints';
-import { ItemLayer, ITEM_CASING_LAYER_ID, ITEM_FILL_LAYER_ID, ITEM_LINE_LAYER_ID } from './itemLayer';
+import {
+  ItemLayer,
+  ITEM_CASING_LAYER_ID,
+  ITEM_FILL_LAYER_ID,
+  ITEM_LINE_LAYER_ID,
+  ITEM_MEASURE_LAYER_ID,
+} from './itemLayer';
 import {
   ImportError,
   defaultColor,
@@ -145,12 +151,22 @@ export function startApp(): void {
   });
 
   function wire(): void {
-    const editor = new ItemEditor(map, (state) => {
-      const wasDrawing = edit.phase === 'drawing';
-      edit = state;
-      if (state.phase === 'editing') syncEditingItem(wasDrawing);
-      render();
-    });
+    const editor = new ItemEditor(
+      map,
+      (state) => {
+        const wasDrawing = edit.phase === 'drawing';
+        edit = state;
+        if (state.phase === 'editing') syncEditingItem(wasDrawing);
+        render();
+      },
+      () => {
+        // 確定したものから離れて、次を描き始めた。前のものは手放す。
+        editingId = null;
+        selectedId = null;
+        listDirty = true;
+        pinLayer.clearDraggable();
+      }
+    );
     const itemLayer = new ItemLayer(map, EDIT_FILL_LAYER_ID);
     const pinLayer = new PinLayer(map, (id) => selectItem(id));
     const labels = new MeasureLabels(map);
@@ -437,11 +453,22 @@ export function startApp(): void {
         selectedId
       );
 
-      // 計測のラベルは、いじっているものと選んでいるものだけ。全部出すと写真が埋まる。
-      const liveLine = editingId !== null && edit.kind === 'line' ? editor.vertices : null;
-      const selectedLine =
-        selected?.kind === 'measure' && selected.id !== editingId ? selected.vertices : null;
-      labels.setLine(liveLine ?? selectedLine ?? []);
+      /*
+       * 計測のラベル。表示モードでは出ているものすべてに出す（測った結果は
+       * 選び直さずに読めるほうがいい）。編集中はいじっている 1 本だけ——
+       * 全部出すと、掴みたい頂点がラベルの下に隠れる。
+       */
+      if (mode === 'view') {
+        labels.setLines(
+          items.filter((item) => item.kind === 'measure' && item.visible).map((item) => item.vertices)
+        );
+      } else {
+        // 引いている最中も長さは見たい。確定を待たせると、行き過ぎてから測り直すことになる。
+        const liveLine = edit.kind === 'line' && edit.vertexCount > 0 ? editor.vertices : null;
+        const selectedLine =
+          selected?.kind === 'measure' && selected.id !== editingId ? selected.vertices : null;
+        labels.setLines([liveLine ?? selectedLine ?? []].filter((line) => line.length > 0));
+      }
 
       if (listDirty) {
         listDirty = false;
@@ -518,7 +545,12 @@ export function startApp(): void {
 
       // 表示モードでは、地図に出ているものを選ぶ。
       const features = map.queryRenderedFeatures(event.point, {
-        layers: [ITEM_FILL_LAYER_ID, ITEM_CASING_LAYER_ID, ITEM_LINE_LAYER_ID],
+        layers: [
+          ITEM_FILL_LAYER_ID,
+          ITEM_CASING_LAYER_ID,
+          ITEM_LINE_LAYER_ID,
+          ITEM_MEASURE_LAYER_ID,
+        ],
       });
       const id = features[0]?.properties?.['id'];
       if (typeof id === 'string') {

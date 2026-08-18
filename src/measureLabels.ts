@@ -11,13 +11,14 @@ const MIN_LABEL_EDGE_PIXELS = 36;
  * MapLibre の symbol レイヤーは字を出すのに glyphs の配信元が要るので、HTML の
  * マーカーで描く。フォントを外部から取りに行かずに済む。
  *
- * 出すのは選択中と描いている最中のものだけ。保存した計測が増えたときに全部出すと、
- * 写真がラベルで埋まって読めなくなる。
+ * 表示モードでは出ているものすべてに、編集中はいじっている 1 本に出す。
+ * 編集中に全部出すと、頂点を掴む先がラベルで隠れる。
  */
 export class MeasureLabels {
   readonly #map: MapLibreMap;
-  readonly #labels = new Map<number, Marker>();
-  #line: Vertex[] = [];
+  /** 鍵は「何本目の何番目の辺か」。線をまたいで同じ番号にならないようにする。 */
+  readonly #labels = new Map<string, Marker>();
+  #lines: Vertex[][] = [];
 
   constructor(map: MapLibreMap) {
     this.#map = map;
@@ -25,13 +26,13 @@ export class MeasureLabels {
     map.on('zoomend', this.#handleZoomEnd);
   }
 
-  setLine(line: Vertex[]): void {
-    this.#line = line;
+  setLines(lines: Vertex[][]): void {
+    this.#lines = lines;
     this.#render();
   }
 
   clear(): void {
-    this.setLine([]);
+    this.setLines([]);
   }
 
   #handleZoomEnd = (): void => {
@@ -39,17 +40,18 @@ export class MeasureLabels {
   };
 
   #render(): void {
-    const line = this.#line;
-    const wanted = new Map<number, { position: Vertex; text: string }>();
-    for (let index = 1; index < line.length; index += 1) {
-      const from = line[index - 1]!;
-      const to = line[index]!;
-      // 画面上で短すぎる辺はラベルが重なって読めないので出さない。
-      if (this.#map.project(from).dist(this.#map.project(to)) < MIN_LABEL_EDGE_PIXELS) continue;
-      wanted.set(index, {
-        position: midpoint(from, to),
-        text: formatDistance(segmentLength(from, to)),
-      });
+    const wanted = new Map<string, { position: Vertex; text: string }>();
+    for (const [line_, line] of this.#lines.entries()) {
+      for (let index = 1; index < line.length; index += 1) {
+        const from = line[index - 1]!;
+        const to = line[index]!;
+        // 画面上で短すぎる辺はラベルが重なって読めないので出さない。
+        if (this.#map.project(from).dist(this.#map.project(to)) < MIN_LABEL_EDGE_PIXELS) continue;
+        wanted.set(`${line_}:${index}`, {
+          position: midpoint(from, to),
+          text: formatDistance(segmentLength(from, to)),
+        });
+      }
     }
 
     // カーソルを動かしているあいだは毎フレームここを通る。作り直すと、そのたびに

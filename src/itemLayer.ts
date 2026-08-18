@@ -1,10 +1,12 @@
 import { GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
+import { MEASURE_DASH } from './editor';
 import { toMapGeoJSON, type Item } from './items';
 
 const SOURCE_ID = 'tanbo-items';
 export const ITEM_FILL_LAYER_ID = 'tanbo-items-fill';
 export const ITEM_CASING_LAYER_ID = 'tanbo-items-casing';
 export const ITEM_LINE_LAYER_ID = 'tanbo-items-line';
+export const ITEM_MEASURE_LAYER_ID = 'tanbo-items-measure';
 
 const EMPTY = { type: 'FeatureCollection' as const, features: [] };
 
@@ -54,10 +56,30 @@ export class ItemLayer {
         id: ITEM_LINE_LAYER_ID,
         type: 'line',
         source: SOURCE_ID,
+        filter: ['==', ['geometry-type'], 'Polygon'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
         paint: {
           'line-color': ['get', 'color'],
           'line-width': ['case', ['get', 'selected'], 3.5, 2],
+        },
+      },
+      beforeLayerId
+    );
+    /*
+     * 計測は破線。田んぼの輪郭と同じ実線だと、囲ったのか測ったのかが見分けにくい。
+     * line-dasharray は属性で変えられないので、線だけ別のレイヤーに分けてある。
+     */
+    map.addLayer(
+      {
+        id: ITEM_MEASURE_LAYER_ID,
+        type: 'line',
+        source: SOURCE_ID,
+        filter: ['==', ['geometry-type'], 'LineString'],
+        layout: { 'line-cap': 'butt', 'line-join': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': ['case', ['get', 'selected'], 3.5, 2],
+          'line-dasharray': MEASURE_DASH,
         },
       },
       beforeLayerId
@@ -73,7 +95,12 @@ export class ItemLayer {
   /** 自動検出が写真だけを読めるよう、描いたものを一時的に隠す。 */
   setVisible(visible: boolean): void {
     const visibility = visible ? 'visible' : 'none';
-    for (const id of [ITEM_FILL_LAYER_ID, ITEM_CASING_LAYER_ID, ITEM_LINE_LAYER_ID]) {
+    for (const id of [
+      ITEM_FILL_LAYER_ID,
+      ITEM_CASING_LAYER_ID,
+      ITEM_LINE_LAYER_ID,
+      ITEM_MEASURE_LAYER_ID,
+    ]) {
       this.#map.setLayoutProperty(id, 'visibility', visibility);
     }
   }

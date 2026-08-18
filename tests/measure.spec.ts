@@ -6,10 +6,10 @@ import {
   hint,
   itemRows,
   openApp,
-  selectRow,
   setMode,
   startEditing,
   startNew,
+  toggleRowVisible,
 } from './helpers';
 
 /**
@@ -122,21 +122,60 @@ test.describe('地図上で距離を測る', () => {
     await expect(page.locator('#measure')).toBeVisible();
   });
 
-  test('選んでいない計測のラベルは出さない', async ({ page }) => {
+  test('表示モードでは、選んでいなくても長さが出る', async ({ page }) => {
     await clickMap(page, 400, 300);
     await clickMap(page, 500, 300);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(300);
     await expect(labels(page)).toHaveCount(1);
 
-    // 写真がラベルで埋まらないよう、選んでいるものだけに出す。
+    // もう 1 本。編集中は、いじっている 1 本だけに出す（頂点がラベルに隠れる）。
+    await clickMap(page, 400, 500);
+    await clickMap(page, 560, 500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    await expect(labels(page)).toHaveCount(1);
+
+    // 測った結果は、選び直さずに読めるほうがいい。
     await setMode(page, 'view');
     await page.mouse.click(900, 650);
     await page.waitForTimeout(300);
-    await expect(labels(page)).toHaveCount(0);
+    await expect(labels(page)).toHaveCount(2);
 
-    await selectRow(page, 0);
+    // 隠したものは地図から消えるので、ラベルも消える。
+    await toggleRowVisible(page, 0);
+    await page.waitForTimeout(300);
     await expect(labels(page)).toHaveCount(1);
+  });
+
+  test('引いている最中も、置いた辺の長さが線の上に出る', async ({ page }) => {
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await page.waitForTimeout(200);
+    // まだ確定していない。行き過ぎてから測り直さずに済むよう、その場で出す。
+    await expect(labels(page)).toHaveCount(1);
+    await expect(labels(page).first()).toHaveText(HORIZONTAL_100PX);
+
+    await clickMap(page, 500, 400);
+    await page.waitForTimeout(200);
+    await expect(labels(page)).toHaveCount(2);
+  });
+
+  test('確定したあと、道具を押し直さずに次の 1 本を引ける', async ({ page }) => {
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+
+    // 線から離れたところを押したら、次を引き始める合図。
+    await clickMap(page, 400, 500);
+    await clickMap(page, 560, 500);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.kind === 'measure')).toBe(true);
   });
 
   test('計測は再読み込みしても残る', async ({ page }) => {
