@@ -1,5 +1,10 @@
 import { GeoJSONSource, type Map as MapLibreMap } from 'maplibre-gl';
-import { MEASURE_DASH } from './editor';
+import {
+  MEASURE_CASING_DASH,
+  MEASURE_CASING_WIDTH,
+  MEASURE_DASH,
+  MEASURE_WIDTH,
+} from './editor';
 import { toMapGeoJSON, type Item } from './items';
 
 const SOURCE_ID = 'tanbo-items';
@@ -47,7 +52,14 @@ export class ItemLayer {
         source: SOURCE_ID,
         filter: ['==', ['geometry-type'], 'LineString'],
         layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': '#1d1d1f', 'line-opacity': 0.55, 'line-width': 6 },
+        paint: {
+          'line-color': '#1d1d1f',
+          // 選んでいるものは縁取りを濃くする。破線なので太さでは見分けにくい
+          // （太さを変えると、破線の間隔も一緒に変わってしまう）。
+          'line-opacity': ['case', ['get', 'selected'], 0.8, 0.5],
+          'line-width': MEASURE_CASING_WIDTH,
+          'line-dasharray': MEASURE_CASING_DASH,
+        },
       },
       beforeLayerId
     );
@@ -78,7 +90,7 @@ export class ItemLayer {
         layout: { 'line-cap': 'butt', 'line-join': 'round' },
         paint: {
           'line-color': ['get', 'color'],
-          'line-width': ['case', ['get', 'selected'], 3.5, 2],
+          'line-width': MEASURE_WIDTH,
           'line-dasharray': MEASURE_DASH,
         },
       },

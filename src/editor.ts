@@ -23,10 +23,17 @@ const HIT_PIXELS = 9;
 /** 指で掴むときの距離。指先は矢印より太いので広く取る。 */
 const TOUCH_HIT_PIXELS = 20;
 /**
- * 計測の破線。単位は線の太さなので、太さ 2px で 8px の線と 6px の空きになる。
- * 田んぼの輪郭は実線のままにして、測った線とすぐ見分けられるようにする。
+ * 計測の破線。dasharray の単位は線の太さなので、線と縁取りで別の値が要る。
+ * どちらも 10px の線と 7.5px の空きになるように、太さ（2.5px と 6px）で割ってある。
+ * 縁取りだけ実線のままだと、下に黒い線が通って破線に見えない。
  */
+export const MEASURE_WIDTH = 2.5;
+export const MEASURE_CASING_WIDTH = 6;
 export const MEASURE_DASH: [number, number] = [4, 3];
+export const MEASURE_CASING_DASH: [number, number] = [
+  (4 * MEASURE_WIDTH) / MEASURE_CASING_WIDTH,
+  (3 * MEASURE_WIDTH) / MEASURE_CASING_WIDTH,
+];
 
 /** 中点ゴーストを出す辺の最小の長さ（スクリーン座標 px）。 */
 const MIN_GHOST_EDGE_PIXELS = 32;
@@ -649,10 +656,14 @@ export class ItemEditor {
     this.#map.setPaintProperty(EDIT_FILL_LAYER_ID, 'fill-color', this.#color);
     this.#map.setPaintProperty(EDIT_LINE_LAYER_ID, 'line-color', this.#color);
     // 計測は破線。田んぼの輪郭（実線）と、測っている線をひと目で見分けられる。
+    // 縁取りも同じ間隔で切る。片方だけ実線だと、黒い線が通って破線に見えない。
+    const line = this.#kind === 'line';
+    this.#map.setPaintProperty(EDIT_LINE_LAYER_ID, 'line-width', line ? MEASURE_WIDTH : 2);
+    this.#map.setPaintProperty(EDIT_LINE_LAYER_ID, 'line-dasharray', line ? MEASURE_DASH : undefined);
     this.#map.setPaintProperty(
-      EDIT_LINE_LAYER_ID,
+      EDIT_CASING_LAYER_ID,
       'line-dasharray',
-      this.#kind === 'line' ? MEASURE_DASH : undefined
+      line ? MEASURE_CASING_DASH : undefined
     );
     this.#map.setPaintProperty(EDIT_VERTEX_LAYER_ID, 'circle-color', [
       'case',
@@ -686,7 +697,11 @@ export class ItemEditor {
       source: SOURCE_ID,
       filter: ['==', ['geometry-type'], 'LineString'],
       layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-color': '#1d1d1f', 'line-opacity': 0.55, 'line-width': 6 },
+      paint: {
+        'line-color': '#1d1d1f',
+        'line-opacity': 0.55,
+        'line-width': MEASURE_CASING_WIDTH,
+      },
     });
 
     this.#map.addLayer({
