@@ -32,6 +32,8 @@ import { DetectPreview, PREVIEW_FILL_LAYER_ID, PREVIEW_LINE_LAYER_ID } from './p
 import { loadSettings, storeSettings, TEXT_SCALE_FACTOR, type Settings } from './settings';
 import { cacheStats, clearTiles, saveTiles, tileUrlsForView, SAVE_TILE_LIMIT } from './tileCache';
 import { iconSvg } from './icons';
+import { captureImage, imageFileName, type CropRect, type ImageFormat } from './snapshot';
+import { CropBar } from './ui/cropBar';
 import { element, isTyping, setIcon } from './ui/dom';
 import { DetailSheet } from './ui/detailSheet';
 import { Panel } from './ui/panel';
@@ -104,6 +106,7 @@ export function startApp(): void {
   const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
   const resetBearingButton = element<HTMLButtonElement>('reset-bearing');
   const panelFields = element('panel-fields');
+  const imageOpenButton = element<HTMLButtonElement>('image-open');
   /** 幅の境目は CSS と同じ。ここを跨いだら、名前や色の欄の置き場所も変える。 */
   const narrowScreen = window.matchMedia('(max-width: 820px)');
   const app = element('app');
@@ -216,6 +219,14 @@ export function startApp(): void {
         listDirty = true;
         render();
       },
+    });
+    // 描画は crop.isOpen を読むので、render が走る前に組み立てておく。
+    const crop = new CropBar(element('map'), {
+      onClose: () => {
+        crop.close();
+        render();
+      },
+      onExport: (rect, format) => void saveImage(rect, format),
     });
     new SettingsSheet(settings, {
       onOverlayChange: (next) => {
@@ -514,6 +525,14 @@ export function startApp(): void {
       }
       // 選択が外れたら詳細のシートも閉じる。宛先のない編集欄を残さない。
       detail.render(selected, folderNames(items));
+      // 画像にできるのは表示モードだけ。編集の道具と場所を取り合わせない。
+      imageOpenButton.hidden = mode !== 'view' || crop.isOpen;
+      // 枠を出しているあいだは、選んだものの情報も案内も引っ込める（写り込む）。
+      if (crop.isOpen) {
+        panel.render(null, false, false);
+        hint.textContent = '地図を動かして枠に収め、「書き出す」を押します';
+      }
+
       // キーボードも右クリックもない端末のために、同じことをボタンでもできるようにする。
       const editing = mode === 'edit' && tool !== 'auto';
       finishButton.hidden = !(editing && edit.phase === 'drawing' && canFinishNow());
@@ -799,6 +818,34 @@ export function startApp(): void {
     map.on('idle', () => {
       if (tileSaving === null) void refreshOfflineStatus();
     });
+
+    // MARK: - 画像にする
+
+    imageOpenButton.addEventListener('click', () => {
+      crop.open();
+      render();
+    });
+
+    /** 枠の中を画像にして落とす。書き出しのあいだは押し直せないようにする。 */
+    async function saveImage(rect: CropRect, format: ImageFormat): Promise<void> {
+      crop.setBusy(true);
+      try {
+        const blob = await captureImage(map, items, rect, format);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = imageFileName(new Date(), format);
+        link.click();
+        // click と同期で revoke すると、ブラウザによってはダウンロードが空振りする。
+        setTimeout(() => URL.revokeObjectURL(url), 0);
+      } catch (error) {
+        notice = '画像を作れませんでした';
+        console.error(error);
+      } finally {
+        crop.setBusy(false);
+        render();
+      }
+    }
 
     // MARK: - 向き
 

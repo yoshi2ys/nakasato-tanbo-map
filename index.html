@@ -101,6 +101,30 @@
 
         <!-- 回した地図を戻す。北を向いているあいだは出さない。 -->
         <button id="reset-bearing" type="button" hidden>北に戻す</button>
+
+        <!-- 見えているところを画像にする。表示モードでだけ出す。 -->
+        <button id="image-open" type="button" hidden>画像にする</button>
+
+        <!--
+          切り取る枠。中は素通しにして、地図を動かして合わせられるようにする。
+          外側は暗くして、どこが写るのかを分かるようにする。
+        -->
+        <div id="crop" hidden>
+          <div id="crop-frame"></div>
+        </div>
+
+        <div id="crop-bar" hidden>
+          <div id="crop-ratios" role="radiogroup" aria-label="比率"></div>
+          <div id="crop-formats" role="radiogroup" aria-label="形式"></div>
+          <label id="crop-size-field">
+            <span>大きさ</span>
+            <input id="crop-size" type="range" min="40" max="100" step="5" value="80" aria-label="枠の大きさ" />
+          </label>
+          <div id="crop-actions">
+            <button id="crop-cancel" type="button">キャンセル</button>
+            <button id="crop-run" type="button">書き出す</button>
+          </div>
+        </div>
       </div>
     </div>
 

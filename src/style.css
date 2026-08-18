@@ -641,6 +641,154 @@ li.selected .item-name {
   color: #fff;
 }
 
+/* 見えているところを画像にする。表示モードでだけ出す。 */
+#image-open {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  font-size: calc(12px * var(--ui-scale));
+  cursor: pointer;
+}
+
+#image-open[hidden] {
+  display: none;
+}
+
+/* 北に戻すボタンと並ぶときは、そのぶん下げる。 */
+#stage:has(#reset-bearing:not([hidden])) #image-open {
+  top: 52px;
+}
+
+/*
+ * 切り取る枠。中は素通しにして、地図をそのまま動かせるようにする。
+ * 外側は枠の影で暗くする（別に覆いを敷くと、その覆いがクリックを奪う）。
+ */
+#crop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+#crop[hidden],
+#crop-bar[hidden] {
+  display: none;
+}
+
+#crop-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgb(255 255 255 / 0.9);
+  border-radius: 4px;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 0.45);
+}
+
+#crop-bar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.94);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 12px rgb(0 0 0 / 0.24);
+}
+
+#crop-ratios,
+#crop-formats,
+#crop-actions {
+  flex: none;
+}
+
+#crop-ratios,
+#crop-formats {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f0f0f2;
+}
+
+#crop-ratios label,
+#crop-formats label {
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: calc(12px * var(--ui-scale));
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#crop-ratios label:has(:checked),
+#crop-formats label:has(:checked) {
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+#crop-ratios input,
+#crop-formats input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 折り返すと読みにくいので、字は行の中で切らない。バーのほうが折り返す。 */
+#crop-size-field {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-size: calc(12px * var(--ui-scale));
+  color: #6e6e73;
+  white-space: nowrap;
+}
+
+#crop-size {
+  width: 96px;
+  accent-color: #0071e3;
+}
+
+#crop-actions {
+  display: flex;
+  gap: 6px;
+}
+
+#crop-actions button {
+  padding: 7px 14px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  font-size: calc(12px * var(--ui-scale));
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#crop-actions button#crop-run {
+  border-color: #0071e3;
+  background: #0071e3;
+  color: #fff;
+}
+
+#crop-actions button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 /* 回した地図を北に戻す。狭い画面ではコンパスを出していないので、これが戻す手段になる。 */
 #reset-bearing {
   position: absolute;
@@ -1011,10 +1159,34 @@ li.selected .item-name {
     font-size: calc(14px * var(--ui-scale));
   }
 
-  #reset-bearing {
+  #reset-bearing,
+  #image-open {
     top: max(8px, env(safe-area-inset-top));
     padding: 0 16px;
     font-size: calc(13px * var(--ui-scale));
+  }
+
+  #stage:has(#reset-bearing:not([hidden])) #image-open {
+    top: max(60px, calc(env(safe-area-inset-top) + 52px));
+  }
+
+  /* 幅が足りないので、選ぶものを 2 段に折り返す。 */
+  #crop-bar {
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    left: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+    transform: none;
+  }
+
+  #crop-ratios label,
+  #crop-formats label,
+  #crop-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
   }
 
   /* パネルが出ているあいだは一覧を引っ込める。2 枚が重なると下のほうが読めない。 */
@@ -1098,6 +1270,7 @@ li.selected .item-name {
   #mode label,
   #tools label,
   #draw-actions button,
+  #image-open,
   #panel-actions button,
   #kind-filters label,
   #library-actions button,

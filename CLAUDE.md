@@ -31,7 +31,8 @@ npm run test:dist    # build 済み dist を preview で配って同じテスト
 - 自動検出: `detect.ts` — 表示中の canvas を読んで OpenCV.js でフラッドフィル → モルフォロジー → `findContours` → `approxPolyDP`。閾値はピクセルではなく**地上距離（m）**で持つ（ズームや画像ソースで 1px の意味が変わるため）。OpenCV.js は 13MB あるので初回の検出まで読み込まない。
 - オフライン: `tileCache.ts` — `tanbo://` の独自プロトコルを maplibre に登録し、タイルを IndexedDB に ArrayBuffer で貯める（Blob は Safari で入らない）。Service Worker（vite.config.ts の VitePWA）はアプリ本体だけを見て、タイルには触らない。この役割分担を混ぜない。
 - UI: `src/ui/` — `sidebar.ts`（左の一覧。検索と種別の絞り込みはここが持つ）、`panel.ts`（地図の右上に浮かべる情報パネル。読むものだけ）、`detailSheet.ts`（名前・色・アイコン・削除）、`settingsSheet.ts`（設定シート。重ねる地図、文字の大きさ、書き出しと読み込み、オフライン用の地図）、`dom.ts`（`element()` などの小物）。DOM は `index.html` に固定 id で書いてあり、各クラスが `element('...')` で拾う。id を変えるときは HTML と両方直す。
-- 向き: 回転は表示モードだけ（`map.ts` の `setRotationEnabled`）。編集に入るときは北へ戻す。傾き（pitch）はどのモードでも切ったまま（検出が真上からの縮尺を前提にしている）。
+- 向き: 回転は表示モードだけ（`map.ts` の `setRotationEnabled`）。編集に入るときは北へ戻す。傾き（pitch）は `maxPitch: 0` でどの経路からも塞いである（検出が真上からの縮尺を前提にしている）。
+- 画像の書き出し: `snapshot.ts` — 表示中の canvas を枠の形に切り、ピン・距離のラベル・出典を 2D で描き足す（HTML の Marker は canvas に写らない）。枠と比率・形式の UI は `ui/cropBar.ts`。
 - 画面下の 1 行は `hints.ts` の純関数。状態から文字列を作るだけで、状態を読みに行かせない。
 
 ## テストの前提
