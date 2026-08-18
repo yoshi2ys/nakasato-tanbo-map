@@ -861,14 +861,19 @@ li.selected .item-name {
 }
 
 /*
- * 電話や横向きの狭い画面。列で並べるのをやめ、一覧とインスペクタは下から出すシートにする。
- * 地図は全面。指で触る前提なので、押せるものは 40px 角を下回らないようにする。
+ * 電話や横向きの狭い画面。列で並べるのをやめ、一覧と情報は下から出すシートにする。
+ * 地図は全面。指で触る前提なので、押せるものは HIG の 44px 角を下回らせない。
  */
 @media (max-width: 820px) {
   #app {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* 画面まわりの字は、指の距離で読む前提でひと回り上げる。 */
+  html,
+  body {
+    font-size: calc(15px * var(--ui-scale));
+  }
 
   #sidebar {
     position: fixed;
@@ -916,6 +921,20 @@ li.selected .item-name {
     display: none;
   }
 
+  #panel-name {
+    font-size: calc(15px * var(--ui-scale));
+  }
+
+  #panel-actions button {
+    padding: 12px 10px;
+    font-size: calc(14px * var(--ui-scale));
+  }
+
+  #reset-bearing {
+    top: max(8px, env(safe-area-inset-top));
+    padding: 0 16px;
+    font-size: calc(13px * var(--ui-scale));
+  }
 
   /* パネルが出ているあいだは一覧を引っ込める。2 枚が重なると下のほうが読めない。 */
   #app.list-open:has(#panel:not([hidden]):not(.draft)) #sidebar {
@@ -973,31 +992,100 @@ li.selected .item-name {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
-    padding: 0;
-    border: 0;
     border-radius: 8px;
     background: none;
     color: #6e6e73;
     cursor: pointer;
   }
 
+  /* シートの見出しに並ぶボタン。指の的として 44px 角を確保する。 */
+  #settings-open,
+  #list-close,
+  #panel-close,
+  #detail-close,
+  #settings-close {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+  }
+
+  /*
+   * 指で押すものは 44px 角を下回らせない（HIG）。字と余白の足し算で決めると、
+   * 文字の大きさの設定を「小」にしたときに 40px を切る。高さのほうを先に決める。
+   */
+  #mode label,
+  #tools label,
+  #draw-actions button,
+  #panel-actions button,
+  #kind-filters label,
+  #library-actions button,
+  #offline-actions button,
+  #reset-bearing,
+  .icon-choice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .swatch {
+    width: 44px;
+    height: 44px;
+  }
+
   #topbar {
     top: max(8px, env(safe-area-inset-top));
     max-width: calc(100% - 16px);
-    padding: 3px;
-    gap: 4px;
+    padding: 4px;
+    gap: 6px;
   }
 
-  /* 幅が足りないので、モードは記号ではなく短い字のまま詰める。 */
+  /*
+   * 高さは 44px を確保するが、横は詰める。
+   * モードと道具 4 つを 393px に収める必要があり、広げると端の「ピン」が画面から出る。
+   */
   #mode label {
-    padding: 5px 10px;
+    padding: 0 12px;
+    font-size: calc(13px * var(--ui-scale));
   }
 
+  /* 道具だけは記号を上、名前を下に置くので、並びは縦のまま。 */
   #tools label {
+    flex-direction: column;
+    gap: 0;
     min-width: 52px;
-    padding: 4px 6px 3px;
+    padding: 4px 4px 3px;
+    font-size: calc(10px * var(--ui-scale));
+  }
+
+  /* 一覧の絞り込みも指で押す。語の欄は 16px を切ると iOS が拡大する。 */
+  #item-search {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: calc(16px * var(--ui-scale));
+  }
+
+  #kind-filters label {
+    padding: 0 8px;
+    font-size: calc(13px * var(--ui-scale));
+  }
+
+  #detail-name {
+    min-height: 44px;
+    padding: 10px 12px;
+    font-size: calc(16px * var(--ui-scale));
+  }
+
+  #detail-color {
+    width: 52px;
+    height: 44px;
+  }
+
+  #detail-delete,
+  #library-actions button {
+    min-height: 44px;
+    font-size: calc(14px * var(--ui-scale));
   }
 
   /* ヒントはシートに隠れないよう、地図の下端から離して置く。 */
@@ -1039,23 +1127,27 @@ li.selected .item-name {
 
   /* 指で押す前提の寸法。一覧の行と、色やアイコンの選択肢を広げる。 */
   #items li {
-    min-height: 44px;
+    min-height: 48px;
   }
 
   #items button {
-    padding: 8px 6px;
+    min-height: 44px;
+    padding: 10px 8px;
   }
 
-  .swatch {
-    width: 26px;
-    height: 26px;
+  #items-empty {
+    font-size: calc(13px * var(--ui-scale));
+  }
+
+  .item-value {
+    font-size: calc(13px * var(--ui-scale));
   }
 
   .icon-choice {
-    padding: 7px;
+    padding: 11px;
   }
 
-  #inspector-icons {
+  #detail-icons {
     grid-template-columns: repeat(6, 1fr);
   }
 

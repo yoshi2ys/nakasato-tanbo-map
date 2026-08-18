@@ -212,4 +212,67 @@ test.describe('電話で使う', () => {
 
     expect((await itemRows(page))[0]?.value).not.toBe(before);
   });
+  test('指で押すものは 44px 角を下回らない', async ({ page }) => {
+    // HIG の最小の的。狭い画面ではここを切ると、隣を押してしまう。
+    const atLeast44 = async (selector: string): Promise<void> => {
+      const box = (await page.locator(selector).first().boundingBox())!;
+      expect(box.width, selector).toBeGreaterThanOrEqual(44);
+      expect(box.height, selector).toBeGreaterThanOrEqual(44);
+    };
+
+    for (const selector of ['#list-open', '#settings-open-map']) await atLeast44(selector);
+
+    await page.locator('#list-open').tap();
+    await page.waitForTimeout(400);
+    for (const selector of [
+      '#list-close',
+      '#settings-open',
+      '#item-search',
+      '#kind-filters label',
+    ]) {
+      await atLeast44(selector);
+    }
+
+    await page.locator('#list-close').tap();
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.waitForTimeout(300);
+    for (const selector of ['#mode label', '#tools label']) await atLeast44(selector);
+
+    // 描いている最中のボタン。指しか使えない端末では、これが唯一の手段になる。
+    await tapMap(page, TRIANGLE[0]![0], TRIANGLE[0]![1]);
+    await atLeast44('#discard-draw');
+    for (const [x, y] of TRIANGLE.slice(1)) await tapMap(page, x, y);
+    await atLeast44('#finish-draw');
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(500);
+
+    // パネルと、その先の詳細シート。
+    for (const selector of ['#panel-detail', '#panel-close']) await atLeast44(selector);
+    await page.locator('#panel-detail').tap();
+    await page.waitForTimeout(400);
+    for (const selector of ['#detail-close', '#detail-name', '.swatch', '#detail-delete']) {
+      await atLeast44(selector);
+    }
+    await page.locator('#detail-close').tap();
+    await page.waitForTimeout(300);
+
+    // 「編集」は編集器に載っていないときだけ出る。表示に戻してから測る。
+    await page.locator('#mode label:has(input[value="view"])').tap();
+    await page.waitForTimeout(300);
+    await atLeast44('#panel-edit');
+  });
+
+  test('ピンのアイコンも指の寸法で選べる', async ({ page }) => {
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.locator('#tools label:has(input[value="pin"])').tap();
+    await page.waitForTimeout(300);
+    await tapMap(page, 200, 300);
+    await page.waitForTimeout(400);
+
+    await page.locator('#panel-detail').tap();
+    await page.waitForTimeout(400);
+    const box = (await page.locator('.icon-choice').first().boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+  });
 });
