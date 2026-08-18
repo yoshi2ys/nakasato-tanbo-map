@@ -178,6 +178,43 @@ test.describe('地図上で距離を測る', () => {
     expect(rows.every((row) => row.kind === 'measure')).toBe(true);
   });
 
+  test('選び直して編集に入ると、末尾から点を継ぎ足せる', async ({ page }) => {
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    const before = (await itemRows(page))[0]?.value;
+
+    // 表示に戻ってから選び直す。現地で「あとちょっと測る」はこの入り方になる。
+    await setMode(page, 'view');
+    await page.locator('#items li .item-select').first().click();
+    await page.waitForTimeout(400);
+    await setMode(page, 'edit');
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('#extend-line')).toBeVisible();
+    await page.locator('#extend-line').click();
+    await clickMap(page, 500, 400);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    // 増えるのは長さだけ。新しい 1 本にはならない。
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.value).not.toBe(before);
+  });
+
+  test('面には継ぎ足しを出さない', async ({ page }) => {
+    await startNew(page, 'manual');
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await clickMap(page, 500, 400);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    // 閉じた輪郭には継ぎ足す先がない。
+    await expect(page.locator('#extend-line')).toBeHidden();
+  });
+
   test('計測は再読み込みしても残る', async ({ page }) => {
     await clickMap(page, 400, 300);
     await clickMap(page, 500, 300);

@@ -69,6 +69,7 @@ const EMPTY_EDIT: EditState = {
   totalMeters: null,
   canDeleteVertex: false,
   selfIntersecting: false,
+  canResume: false,
 };
 
 /**
@@ -96,6 +97,7 @@ export function startApp(): void {
   const finishButton = element<HTMLButtonElement>('finish-draw');
   const discardButton = element<HTMLButtonElement>('discard-draw');
   const deleteVertexButton = element<HTMLButtonElement>('delete-vertex');
+  const extendLineButton = element<HTMLButtonElement>('extend-line');
   const listOpenButton = element<HTMLButtonElement>('list-open');
   const listCloseButton = element<HTMLButtonElement>('list-close');
   const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
@@ -306,6 +308,9 @@ export function startApp(): void {
     function loadIntoEditor(item: Item): void {
       setTool(KIND_TOOL[item.kind], false);
       editingId = item.id;
+      // 一覧を描き直して、この行を「編集中の行」として掴み直す。
+      // ここを飛ばすと、ドラッグや継ぎ足しのあいだ行の数値が古いまま止まる。
+      listDirty = true;
       editor.load(KIND_SHAPE[item.kind], item.vertices, item.color);
       if (item.kind === 'pin') pinLayer.setDraggable(item.id, (position) => movePin(item.id, position));
     }
@@ -499,8 +504,13 @@ export function startApp(): void {
         edit.selectedVertex !== null &&
         edit.canDeleteVertex
       );
+      // 確定した線は、末尾から点を継ぎ足せる。選び直して編集に入ったときも同じ。
+      extendLineButton.hidden = !(editing && edit.canResume);
       drawActions.hidden =
-        finishButton.hidden && discardButton.hidden && deleteVertexButton.hidden;
+        finishButton.hidden &&
+        discardButton.hidden &&
+        deleteVertexButton.hidden &&
+        extendLineButton.hidden;
     }
 
     // MARK: - 地図のクリック
@@ -508,6 +518,7 @@ export function startApp(): void {
     finishButton.prepend(iconSvg('check', 18));
     discardButton.prepend(iconSvg('close', 18));
     deleteVertexButton.prepend(iconSvg('delete', 18));
+    extendLineButton.prepend(iconSvg('add', 18));
     finishButton.addEventListener('click', () => {
       editor.finish();
       finishButton.blur();
@@ -519,6 +530,10 @@ export function startApp(): void {
     deleteVertexButton.addEventListener('click', () => {
       editor.deleteSelectedVertex();
       deleteVertexButton.blur();
+    });
+    extendLineButton.addEventListener('click', () => {
+      editor.resume();
+      extendLineButton.blur();
     });
 
     map.on('mousemove', (event) => {

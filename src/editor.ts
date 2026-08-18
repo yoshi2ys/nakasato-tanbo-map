@@ -82,6 +82,8 @@ export interface EditState {
   canDeleteVertex: boolean;
   /** 輪郭が自分自身と交差している状態。この面積は当てにならない。 */
   selfIntersecting: boolean;
+  /** 確定した線の末尾から、また点を置ける状態か。 */
+  canResume: boolean;
 }
 
 const EMPTY_COLLECTION: FeatureCollection = { type: 'FeatureCollection', features: [] };
@@ -283,6 +285,25 @@ export class ItemEditor {
    */
   finish(): void {
     this.#close();
+  }
+
+  /**
+   * 確定した線の末尾から、また点を置けるようにする。
+   *
+   * 面は閉じてしまうと継ぎ足す先がないので、線だけ。クリックの意味は
+   * 「離れたところ＝次の 1 本」に使ってしまったので、継ぎ足しはボタンで受ける。
+   */
+  resume(): void {
+    if (this.#kind !== 'line' || this.#phase !== 'editing') return;
+    this.#phase = 'drawing';
+    this.#selected = null;
+    this.#endDrag();
+    this.#render();
+  }
+
+  /** いま継ぎ足せるか。ボタンを出すかどうかの判断に使う。 */
+  get canResume(): boolean {
+    return this.#kind === 'line' && this.#phase === 'editing' && this.#vertices.length > 0;
   }
 
   /**
@@ -589,6 +610,7 @@ export class ItemEditor {
     this.#onChange({
       kind: this.#kind,
       phase: this.#phase,
+      canResume: this.canResume,
       vertexCount: this.#vertices.length,
       selectedVertex: this.#selected,
       areaSquareMeters: this.#areaSquareMeters,
