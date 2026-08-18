@@ -43,7 +43,10 @@ const DEFAULT_COLORS: Record<ItemKind, string> = {
   pin: '#0071e3',
 };
 
-/** 種類の呼び名。名前の頭にも、インスペクタの見出しにも使う。 */
+/** 一覧の絞り込みなど、種類を順に並べるときの順番。道具の並びと同じにする。 */
+export const KINDS: ItemKind[] = ['paddy', 'measure', 'pin'];
+
+/** 種類の呼び名。名前の頭にも、パネルや詳細の見出しにも使う。 */
 const KIND_LABEL: Record<ItemKind, string> = {
   paddy: '田んぼ',
   measure: '計測',

@@ -3,12 +3,15 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
+  closeSettings,
   collectErrors,
   dragMap,
   drawPolygon,
   EDIT_HINT,
+  exportGeoJSON,
   hint,
   openApp,
+  openSettings,
   startEditing,
   itemRows,
   startNew,
@@ -49,13 +52,17 @@ test.describe('複数の田んぼを持ち回る', () => {
 
   test('輪郭を閉じると一覧に保存され、再読み込みしても残る', async ({ page }) => {
     await expect(page.locator('#items-empty')).toBeVisible();
+    await openSettings(page);
     await expect(page.locator('#export')).toBeDisabled();
+    await closeSettings(page);
 
     await drawPolygon(page, FIRST);
     let rows = await itemRows(page);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.selected).toBe(true);
+    await openSettings(page);
     await expect(page.locator('#export')).toBeEnabled();
+    await closeSettings(page);
 
     await startNew(page);
     await drawPolygon(page, SECOND);
@@ -99,10 +106,8 @@ test.describe('複数の田んぼを持ち回る', () => {
     await startNew(page);
     await drawPolygon(page, SECOND);
 
-    const download = page.waitForEvent('download');
-    await page.locator('#export').click();
     const file = join(work, 'tanbo.geojson');
-    await (await download).saveAs(file);
+    await exportGeoJSON(page, file);
 
     const exported = JSON.parse(readFileSync(file, 'utf8'));
     expect(exported.type).toBe('FeatureCollection');
@@ -134,10 +139,8 @@ test.describe('複数の田んぼを持ち回る', () => {
   test('同じファイルを 2 回読んでも独立した 1 枚として扱う', async ({ page }) => {
     await drawPolygon(page, FIRST);
 
-    const download = page.waitForEvent('download');
-    await page.locator('#export').click();
     const file = join(work, 'tanbo.geojson');
-    await (await download).saveAs(file);
+    await exportGeoJSON(page, file);
 
     await page.setInputFiles('#import-file', file);
     await page.waitForTimeout(600);
@@ -166,10 +169,8 @@ test.describe('複数の田んぼを持ち回る', () => {
 
     expect((await itemRows(page)).at(-1)?.value).toBe('輪郭が交差');
 
-    const download = page.waitForEvent('download');
-    await page.locator('#export').click();
     const file = join(work, 'bowtie.geojson');
-    await (await download).saveAs(file);
+    await exportGeoJSON(page, file);
 
     const exported = JSON.parse(readFileSync(file, 'utf8'));
     const crossed = exported.features.find(

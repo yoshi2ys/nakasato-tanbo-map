@@ -240,6 +240,8 @@ export function startApp(): void {
         editingId = item.id;
         selectedId = item.id;
         listDirty = true;
+        // 絞り込んだままだと、いま描いたものが一覧に出ない。
+        sidebar.resetFilter();
         editor.setColor(item.color);
       } else {
         items = items.map((item) => (item.id === editingId ? { ...item, vertices } : item));
@@ -621,6 +623,8 @@ export function startApp(): void {
         // 取り込んだものは別のものとして足す。既存を消したいときは一覧から削除する。
         items = merge(items, imported.items);
         commitEditing();
+        // 読み込んだものが絞り込みで見えないと、取り込めたのかどうかが分からない。
+        sidebar.resetFilter();
         selectedId = null;
         notice = imported.skipped === 0 ? null : `${imported.skipped} 件は取り込めませんでした`;
         persist();

@@ -2,19 +2,21 @@ import { iconSvg } from '../icons';
 import {
   isItemReliable,
   itemArea,
+  itemIcon,
   itemLength,
+  kindLabel,
+  KINDS,
   type Item,
   type ItemKind,
 } from '../items';
 import { formatArea, formatDistance } from '../units';
 import { element } from './dom';
 
-/** 一覧の行の頭に出すアイコン。ピンは選んだアイコンをそのまま使う。 */
-const KIND_ICON: Record<ItemKind, string> = {
-  paddy: 'crop_free',
-  measure: 'straighten',
-  pin: 'location_on',
-};
+const NOTHING_YET = 'まだありません。「編集」に切り替えて描くと、ここに並びます。';
+const NOTHING_MATCHED = '当てはまるものがありません。';
+
+/** 種別の絞り込み。「すべて」は種別を問わない。 */
+type KindFilter = ItemKind | 'all';
 
 export interface SidebarCallbacks {
   onSelect: (id: string) => void;
@@ -29,23 +31,102 @@ export interface SidebarCallbacks {
 export class Sidebar {
   readonly #list = element<HTMLUListElement>('items');
   readonly #empty = element('items-empty');
+  readonly #search = element<HTMLInputElement>('item-search');
+  readonly #kindFilters = element('kind-filters');
   readonly #callbacks: SidebarCallbacks;
   /** 編集中の行だけ、面積を書き換えるために覚えておく。 */
   #liveValue: HTMLElement | null = null;
   #liveId: string | null = null;
+  /**
+   * 絞り込みは一覧の見え方だけの話なので、ここで持つ。
+   * アプリ側に持たせると、語を 1 文字打つたびに地図まで作り直すことになる。
+   */
+  #query = '';
+  #kind: KindFilter = 'all';
+  #items: Item[] = [];
+  #selectedId: string | null = null;
+  #editingId: string | null = null;
 
   constructor(callbacks: SidebarCallbacks) {
     this.#callbacks = callbacks;
+    this.#buildKindFilters();
+    this.#search.addEventListener('input', () => {
+      this.#query = this.#search.value.trim();
+      this.#paint();
+    });
   }
 
   render(items: Item[], selectedId: string | null, editingId: string | null): void {
-    this.#liveValue = null;
-    this.#liveId = editingId;
+    this.#items = items;
+    this.#selectedId = selectedId;
+    this.#editingId = editingId;
+    this.#paint();
+  }
 
+  /**
+   * 絞り込みを外す。新しく作ったものが絞り込みから外れていると、
+   * 描いたのに一覧に出ず、保存できたのかどうかが読めない。
+   */
+  resetFilter(): void {
+    if (this.#query === '' && this.#kind === 'all') return;
+    this.#query = '';
+    this.#kind = 'all';
+    this.#search.value = '';
+    for (const input of this.#kindFilters.querySelectorAll('input')) {
+      input.checked = input.value === 'all';
+    }
+    this.#paint();
+  }
+
+  /** 絞り込んだ結果を並べ直す。 */
+  #paint(): void {
+    this.#liveValue = null;
+    this.#liveId = this.#editingId;
+
+    const shown = this.#items.filter((item) => this.#matches(item));
     this.#list.replaceChildren(
-      ...items.map((item) => this.#row(item, item.id === selectedId, item.id === editingId))
+      ...shown.map((item) =>
+        this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
+      )
     );
-    this.#empty.hidden = items.length > 0;
+
+    this.#empty.hidden = shown.length > 0;
+    // 1 つも無いのか、絞り込みで消えたのかで、次にすることが違う。
+    this.#empty.textContent = this.#items.length === 0 ? NOTHING_YET : NOTHING_MATCHED;
+  }
+
+  #matches(item: Item): boolean {
+    if (this.#kind !== 'all' && item.kind !== this.#kind) return false;
+    if (this.#query === '') return true;
+    return item.name.toLowerCase().includes(this.#query.toLowerCase());
+  }
+
+  #buildKindFilters(): void {
+    const choices: { value: KindFilter; label: string }[] = [
+      { value: 'all', label: 'すべて' },
+      ...KINDS.map((kind) => ({ value: kind as KindFilter, label: kindLabel(kind) })),
+    ];
+
+    this.#kindFilters.replaceChildren(
+      ...choices.map(({ value, label }) => {
+        const wrapper = document.createElement('label');
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'kind-filter';
+        input.value = value;
+        input.id = `kind-filter-${value}`;
+        input.checked = value === this.#kind;
+        input.addEventListener('change', () => {
+          if (!input.checked) return;
+          this.#kind = value;
+          this.#paint();
+        });
+        const text = document.createElement('span');
+        text.textContent = label;
+        wrapper.append(input, text);
+        return wrapper;
+      })
+    );
   }
 
   /** ドラッグ中は一覧を作り直さず、編集中の行の数値だけ書き換える。 */
@@ -69,7 +150,7 @@ export class Sidebar {
     const icon = document.createElement('span');
     icon.className = 'item-icon';
     icon.style.color = item.color;
-    icon.append(iconSvg(item.kind === 'pin' ? (item.icon ?? KIND_ICON.pin) : KIND_ICON[item.kind], 16));
+    icon.append(iconSvg(itemIcon(item), 16));
 
     const name = document.createElement('span');
     name.className = 'item-name';

@@ -15,14 +15,14 @@
           <button id="list-close" type="button" aria-label="一覧を閉じる"></button>
         </header>
 
-        <ul id="items"></ul>
-        <p id="items-empty">まだありません。「編集」に切り替えて描くと、ここに並びます。</p>
-
-        <div id="library-actions">
-          <button id="export" type="button" disabled>書き出す</button>
-          <button id="import" type="button" disabled>読み込む</button>
-          <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
+        <div id="list-filters">
+          <input id="item-search" type="search" placeholder="名前で探す" aria-label="名前で探す" />
+          <div id="kind-filters" role="radiogroup" aria-label="種別で絞る"></div>
         </div>
+
+        <ul id="items"></ul>
+        <!-- 文言は sidebar.ts が入れる。まだ何も無いのか、絞り込みで消えたのかで変わる。 -->
+        <p id="items-empty"></p>
       </aside>
 
       <div id="stage">
@@ -143,16 +143,25 @@
         </section>
 
         <section>
+          <h3>データ</h3>
+          <div id="library-actions">
+            <button id="export" type="button" disabled>書き出す</button>
+            <button id="import" type="button" disabled>読み込む</button>
+            <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />
+          </div>
+          <p class="note">
+            描いたものはこのブラウザに保存されます。端末を変えるときや念のための控えには、
+            GeoJSON に書き出しておいてください。読み込んだものは既存に足されます。
+          </p>
+        </section>
+
+        <section>
           <h3>オフライン用の地図</h3>
           <p id="offline-status">確認中…</p>
           <div id="offline-actions">
             <button id="offline-save" type="button" disabled>この範囲を保存</button>
             <button id="offline-clear" type="button" disabled>消す</button>
           </div>
-          <p class="note">
-            描いたものはこのブラウザに保存されます。端末を変えるときや念のための控えには、
-            一覧の「書き出す」を使ってください。
-          </p>
         </section>
 
         <section>
