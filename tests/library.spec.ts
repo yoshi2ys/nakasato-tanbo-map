@@ -181,6 +181,37 @@ test.describe('複数の田んぼを持ち回る', () => {
     expect(crossed.properties.areaSquareMeters).toBeNull();
   });
 
+  test('設定からすべて削除できる。確認を挟み、取り消せる', async ({ page }) => {
+    await drawPolygon(page, FIRST);
+    await startNew(page);
+    await drawPolygon(page, SECOND);
+    expect(await itemRows(page)).toHaveLength(2);
+
+    await openSettings(page);
+    page.once('dialog', (dialog) => {
+      // 何件消えるのかを言ってから聞く。
+      expect(dialog.message()).toContain('2 件');
+      void dialog.dismiss();
+    });
+    await page.locator('#clear-items').click();
+    await page.waitForTimeout(300);
+    expect(await itemRows(page)).toHaveLength(2);
+
+    page.once('dialog', (dialog) => void dialog.accept());
+    await page.locator('#clear-items').click();
+    await page.waitForTimeout(400);
+    expect(await itemRows(page)).toHaveLength(0);
+    // 消したあとは押せない。空に対して確認を出しても意味がない。
+    await expect(page.locator('#clear-items')).toBeDisabled();
+    await closeSettings(page);
+
+    // 消えたことは保存にも残る。
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('#mode input[value="edit"]')).toBeEnabled({ timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    expect(await itemRows(page)).toHaveLength(0);
+  });
+
   test('削除は確認を挟み、取り消せる', async ({ page }) => {
     await drawPolygon(page, FIRST);
 

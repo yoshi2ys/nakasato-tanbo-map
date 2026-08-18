@@ -94,6 +94,7 @@ export function startApp(): void {
   const exportButton = element<HTMLButtonElement>('export');
   const importButton = element<HTMLButtonElement>('import');
   const importFile = element<HTMLInputElement>('import-file');
+  const clearItemsButton = element<HTMLButtonElement>('clear-items');
   const offlineStatus = element('offline-status');
   const offlineSaveButton = element<HTMLButtonElement>('offline-save');
   const offlineClearButton = element<HTMLButtonElement>('offline-clear');
@@ -508,6 +509,7 @@ export function startApp(): void {
       for (const input of modeInputs) input.disabled = busy;
       for (const input of toolInputs) input.disabled = busy;
       exportButton.disabled = busy || items.length === 0;
+      clearItemsButton.disabled = busy || items.length === 0;
       importButton.disabled = busy;
 
       itemLayer.setItems(items, selectedId, editingId);
@@ -741,6 +743,28 @@ export function startApp(): void {
     });
 
     importButton.addEventListener('click', () => importFile.click());
+
+    /*
+     * 全部消す。端末を渡すときや、去年の分をまとめて片付けるときのため。
+     * 消える範囲を数で言ってから聞く（「すべて」だけでは、何が消えるのか分からない）。
+     */
+    clearItemsButton.addEventListener('click', () => {
+      if (items.length === 0) return;
+      if (!confirm(`${items.length} 件をすべて削除しますか？ 書き出していないものは戻せません`)) {
+        return;
+      }
+      detectionToken += 1;
+      items = [];
+      selectedId = null;
+      editingId = null;
+      commitEditing();
+      settings = { ...settings, groups: [], collapsedGroups: [] };
+      storeSettings(settings);
+      notice = null;
+      persist();
+      listDirty = true;
+      render();
+    });
 
     importFile.addEventListener('change', async () => {
       const file = importFile.files?.[0];

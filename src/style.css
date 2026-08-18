@@ -1001,6 +1001,24 @@ li.selected .item-name {
   background: #e8f4ff;
 }
 
+/* 戻せない操作は赤で、押す前に何件消えるかを confirm で言う。 */
+#clear-items {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 7px 10px;
+  border: 1px solid #d2d2d7;
+  border-radius: 8px;
+  background: #fff;
+  color: #c8102e;
+  font-size: calc(12px * var(--ui-scale));
+  cursor: pointer;
+}
+
+#clear-items:disabled {
+  color: #b0b0b5;
+  cursor: default;
+}
+
 #detail-delete {
   padding: 7px 10px;
   border: 1px solid #d2d2d7;
@@ -1397,6 +1415,7 @@ li.selected .item-name {
   }
 
   #detail-delete,
+  #clear-items,
   #library-actions button {
     min-height: 44px;
     font-size: calc(14px * var(--ui-scale));
