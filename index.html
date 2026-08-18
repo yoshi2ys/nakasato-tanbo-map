@@ -65,7 +65,8 @@
 
         <!--
           選んでいるものの情報。地図の右上に浮かせる。
-          出すのは読むためのものだけで、名前・色・アイコン・削除は「詳細」のシートで扱う。
+          広い画面で編集しているあいだは、名前や色の欄（#item-fields）もここに入る。
+          それ以外のときは「詳細」のシートに入る。欄そのものは 1 組しかない。
         -->
         <div id="panel" hidden>
           <header id="panel-header">
@@ -87,9 +88,13 @@
 
           <p id="panel-position" hidden></p>
 
+          <!-- 名前・色・アイコンの欄をここへ差し込む（広い画面で編集しているとき）。 -->
+          <div id="panel-fields" hidden></div>
+
           <div id="panel-actions">
             <button id="panel-detail" type="button">詳細</button>
             <button id="panel-edit" type="button">編集</button>
+            <button id="panel-delete" type="button" hidden>削除</button>
           </div>
         </div>
 
@@ -105,22 +110,25 @@
           <button id="detail-close" type="button" aria-label="閉じる"></button>
         </header>
 
-        <label class="field">
-          <span>名前</span>
-          <input id="detail-name" type="text" />
-        </label>
+        <!-- 欄はここか、パネルの中かのどちらかに置く。同じものを 2 つ作らない。 -->
+        <div id="item-fields">
+          <label class="field">
+            <span>名前</span>
+            <input id="detail-name" type="text" />
+          </label>
 
-        <div class="field">
-          <span>色</span>
-          <div id="detail-colors">
-            <input id="detail-color" type="color" aria-label="色" />
-            <div id="detail-swatches"></div>
+          <div class="field">
+            <span>色</span>
+            <div id="detail-colors">
+              <input id="detail-color" type="color" aria-label="色" />
+              <div id="detail-swatches"></div>
+            </div>
           </div>
-        </div>
 
-        <div class="field" id="detail-icon-field" hidden>
-          <span>アイコン</span>
-          <div id="detail-icons"></div>
+          <div class="field" id="detail-icon-field" hidden>
+            <span>アイコン</span>
+            <div id="detail-icons"></div>
+          </div>
         </div>
 
         <button id="detail-delete" type="button">削除</button>

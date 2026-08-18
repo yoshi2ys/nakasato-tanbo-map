@@ -15,7 +15,8 @@ export interface DetailCallbacks {
 /**
  * 選んでいるものの名前・色・アイコンを変えるシート。設定と同じ重ね方で出す。
  *
- * 入力欄は打つそばから反映する。保存はアプリ側でまとめて遅らせる。
+ * 欄そのもの（#item-fields）はパネルと共有する。広い画面で編集しているあいだは
+ * パネルへ移り、ここは空になる。入力欄は打つそばから反映し、保存はアプリ側で遅らせる。
  */
 export class DetailSheet {
   readonly #root = element('detail');
@@ -25,6 +26,7 @@ export class DetailSheet {
   readonly #swatches = element('detail-swatches');
   readonly #iconField = element('detail-icon-field');
   readonly #icons = element('detail-icons');
+  readonly #fields = element('item-fields');
   readonly #deleteButton = element<HTMLButtonElement>('detail-delete');
   readonly #closeButton = element<HTMLButtonElement>('detail-close');
   readonly #callbacks: DetailCallbacks;
@@ -53,6 +55,19 @@ export class DetailSheet {
     window.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && !this.#root.hidden) this.close();
     });
+  }
+
+  /** 欄を引き取って、指定の場所へ移す。入力欄は同じものなので、聞き手も値も変わらない。 */
+  moveFieldsTo(container: HTMLElement): void {
+    if (this.#fields.parentElement === container) return;
+    container.append(this.#fields);
+    this.close();
+  }
+
+  /** 欄をシートへ戻す。削除ボタンの前が定位置。 */
+  restoreFields(): void {
+    if (this.#fields.parentElement === this.#deleteButton.parentElement) return;
+    this.#deleteButton.before(this.#fields);
   }
 
   open(): void {

@@ -1,11 +1,9 @@
 import { expect, test } from '@playwright/test';
 import {
   clickMap,
-  closeDetail,
   collectErrors,
   itemRows,
   openApp,
-  openDetail,
   selectRow,
   setMode,
   startEditing,
@@ -46,7 +44,6 @@ test.describe('ピンを立てる', () => {
     await clickMap(page, 700, 300);
     await page.waitForTimeout(300);
 
-    await openDetail(page);
     await page.locator('#detail-name').fill('水口');
     await page.locator('.swatch[data-color="#00acc1"]').click();
     await page.locator('.icon-choice[data-icon="water_drop"]').click();
@@ -74,9 +71,7 @@ test.describe('ピンを立てる', () => {
   test('ピンは再読み込みしても残り、表示から選べる', async ({ page }) => {
     await clickMap(page, 700, 300);
     await page.waitForTimeout(300);
-    await openDetail(page);
     await page.locator('#detail-name').fill('出入口');
-    await closeDetail(page);
     await startNew(page, 'pin');
     await clickMap(page, 950, 500);
     await page.waitForTimeout(700);

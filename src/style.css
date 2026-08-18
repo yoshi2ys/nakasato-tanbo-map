@@ -533,6 +533,25 @@ li.selected .item-name {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 名前や色の欄の置き場所。中の間隔は #item-fields が持つので、
+ * シートに入っているときと同じ見え方になる。
+ */
+#panel-fields[hidden] {
+  display: none;
+}
+
+/* 欄が入るぶんだけ広げる。色見本が 3 段に折り返すと、押し間違えやすくなる。 */
+#panel:has(#panel-fields:not([hidden])) {
+  width: 248px;
+}
+
+#item-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
 #panel-actions {
   display: flex;
   gap: 6px;

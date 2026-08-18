@@ -262,6 +262,22 @@ test.describe('電話で使う', () => {
     await atLeast44('#panel-edit');
   });
 
+  test('狭い画面では、編集中でも欄はシートの中', async ({ page }) => {
+    await page.locator('#mode label:has(input[value="edit"])').tap();
+    await page.waitForTimeout(300);
+    for (const [x, y] of TRIANGLE) await tapMap(page, x, y);
+    await page.locator('#finish-draw').tap();
+    await page.waitForTimeout(500);
+
+    // 右上に浮かべる余裕がないので、パネルは読むだけに留める。
+    await expect(page.locator('#panel-fields')).toBeHidden();
+    await expect(page.locator('#panel-detail')).toBeVisible();
+
+    await page.locator('#panel-detail').tap();
+    await page.waitForTimeout(400);
+    await expect(page.locator('#detail-sheet #detail-name')).toBeVisible();
+  });
+
   test('ピンのアイコンも指の寸法で選べる', async ({ page }) => {
     await page.locator('#mode label:has(input[value="edit"])').tap();
     await page.locator('#tools label:has(input[value="pin"])').tap();

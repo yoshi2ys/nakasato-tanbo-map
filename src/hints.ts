@@ -57,7 +57,7 @@ export function hintText(input: HintInput): string {
   if (input.mode === 'view') {
     if (input.itemCount === 0) return '「編集」に切り替えると、田んぼを描けます';
     if (input.hasSelection) return '「編集」に切り替えると、選んだものを直せます';
-    return '地図か一覧から選ぶと、詳しい内容が右に出ます';
+    return '地図か一覧から選ぶと、面積や長さが地図の右上に出ます';
   }
 
   switch (input.tool) {

@@ -60,10 +60,11 @@ test.describe('手動でポリゴンを描く', () => {
     ]);
 
     // 中身が増えても右上の一角から出ない。広がったぶんの地図は押しやられず覆われる。
+    // 編集中は名前や色の欄も入るので、その幅（248px）と高さを見込む。
     const shown = (await box())!;
-    expect(shown.width).toBeLessThan(240);
-    expect(shown.left).toBeGreaterThan(1100);
-    expect(shown.bottom).toBeLessThan(280);
+    expect(shown.width).toBeLessThan(280);
+    expect(shown.left).toBeGreaterThan(1050);
+    expect(shown.bottom).toBeLessThan(500);
 
     // パネルのすぐ下は地図のまま。覆われていれば、ここに置いた頂点は黙って落ちる。
     await startNew(page);

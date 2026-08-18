@@ -94,6 +94,9 @@ export function startApp(): void {
   const listCloseButton = element<HTMLButtonElement>('list-close');
   const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
   const resetBearingButton = element<HTMLButtonElement>('reset-bearing');
+  const panelFields = element('panel-fields');
+  /** 幅の境目は CSS と同じ。ここを跨いだら、名前や色の欄の置き場所も変える。 */
+  const narrowScreen = window.matchMedia('(max-width: 820px)');
   const app = element('app');
   setIcon(listOpenButton, 'list_alt');
   setIcon(listCloseButton, 'close');
@@ -168,6 +171,7 @@ export function startApp(): void {
     });
     const panel = new Panel({
       onDetail: () => detail.open(),
+      onDelete: (id) => removeItem(id),
       onEdit: (id) => {
         setMode('edit');
         selectItem(id);
@@ -449,7 +453,12 @@ export function startApp(): void {
       if (selected === null && edit.vertexCount > 0) {
         panel.renderDraft(edit.areaSquareMeters, edit.totalMeters);
       } else {
-        panel.render(selected, selected !== null && selected.id === editingId);
+        // 広い画面で編集しているあいだは、名前や色の欄をパネルの中に入れる。
+        // 直しながら地図を見られる。狭い画面では地図が塞がるので、シートのまま。
+        const inlineFields = mode === 'edit' && selected !== null && !narrowScreen.matches;
+        if (inlineFields) detail.moveFieldsTo(panelFields);
+        else detail.restoreFields();
+        panel.render(selected, selected !== null && selected.id === editingId, inlineFields);
       }
       // 選択が外れたら詳細のシートも閉じる。宛先のない編集欄を残さない。
       detail.render(selected);

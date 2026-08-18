@@ -7,6 +7,7 @@ import {
   openApp,
   openDetail,
   selectRow,
+  setMode,
   startEditing,
   startNew,
   toggleRowVisible,
@@ -61,8 +62,9 @@ test.describe('一覧から名前・色・表示を変える', () => {
   });
 
   test('名前と色を変えると、一覧と地図と保存に載る', async ({ page }) => {
+    // 広い画面の編集中は、名前も色もパネルの中で直に変えられる。
     await drawPolygon(page, SQUARE);
-    await openDetail(page);
+    await expect(page.locator('#panel-fields')).toBeVisible();
     await page.locator('#detail-name').fill('大屋敷の田んぼ');
     await page.waitForTimeout(200);
     expect((await itemRows(page))[0]?.name).toBe('大屋敷の田んぼ');
@@ -80,16 +82,33 @@ test.describe('一覧から名前・色・表示を変える', () => {
     await page.waitForTimeout(1500);
 
     expect((await itemRows(page))[0]?.name).toBe('大屋敷の田んぼ');
+    // 表示モードでは欄はシートの中。読むだけのパネルを小さく保つため。
     await selectRow(page, 0);
     await openDetail(page);
     await expect(page.locator('#detail-color')).toHaveValue('#43a047');
+  });
+
+  test('欄は、編集中はパネルの中、表示ではシートの中に置かれる', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+
+    // 編集中は触りながら直せるほうが速い。同じ欄が 2 つある状態は作らない。
+    await expect(page.locator('#panel-fields #detail-name')).toBeVisible();
+    await expect(page.locator('#panel-detail')).toBeHidden();
+    await expect(page.locator('#panel-delete')).toBeVisible();
+
+    await setMode(page, 'view');
+    await page.waitForTimeout(300);
+    await expect(page.locator('#panel-fields')).toBeHidden();
+    await expect(page.locator('#panel-detail')).toBeVisible();
+
+    await openDetail(page);
+    await expect(page.locator('#detail-sheet #detail-name')).toBeVisible();
   });
 
   test('名前を打っているあいだの Backspace で頂点が減らない', async ({ page }) => {
     await drawPolygon(page, SQUARE);
     const before = (await itemRows(page))[0]?.value;
 
-    await openDetail(page);
     await page.locator('#detail-name').click();
     await page.keyboard.press('Backspace');
     await page.keyboard.press('Backspace');
