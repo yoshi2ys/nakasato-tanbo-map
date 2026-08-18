@@ -1,5 +1,13 @@
 import { iconSvg } from '../icons';
-import { isItemReliable, itemArea, itemIcon, itemLength, kindLabel, type Item } from '../items';
+import {
+  isItemReliable,
+  isLightColor,
+  itemArea,
+  itemIcon,
+  itemLength,
+  kindLabel,
+  type Item,
+} from '../items';
 import { formatArea, formatDistance } from '../units';
 import { element, setIcon } from './dom';
 
@@ -94,6 +102,7 @@ export class Panel {
     this.#name.title = `${kindLabel(item.kind)}：${item.name}`;
     this.#icon.replaceChildren(iconSvg(itemIcon(item), 16));
     this.#icon.style.color = item.color;
+    this.#icon.classList.toggle('light', isLightColor(item.color));
 
     this.#showMetrics(itemArea(item), itemLength(item), isItemReliable(item));
 

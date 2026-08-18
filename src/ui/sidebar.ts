@@ -1,6 +1,7 @@
 import { iconSvg } from '../icons';
 import {
   isItemReliable,
+  isLightColor,
   itemArea,
   itemIcon,
   itemLength,
@@ -150,6 +151,8 @@ export class Sidebar {
     const icon = document.createElement('span');
     icon.className = 'item-icon';
     icon.style.color = item.color;
+    // 白い記号は白い地に沈む。縁を付けて輪郭を残す。
+    icon.classList.toggle('light', isLightColor(item.color));
     icon.append(iconSvg(itemIcon(item), 16));
 
     const name = document.createElement('span');

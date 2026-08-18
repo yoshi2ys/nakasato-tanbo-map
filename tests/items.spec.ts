@@ -105,6 +105,16 @@ test.describe('一覧から名前・色・表示を変える', () => {
     await expect(page.locator('#detail-sheet #detail-name')).toBeVisible();
   });
 
+  test('白い記号は縁を付けて、白い地でも輪郭を残す', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await expect(page.locator('#items li .item-icon')).not.toHaveClass(/light/);
+
+    await page.locator('.swatch[data-color="#ffffff"]').click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('#items li .item-icon')).toHaveClass(/light/);
+    await expect(page.locator('#panel-icon')).toHaveClass(/light/);
+  });
+
   test('名前を打っているあいだの Backspace で頂点が減らない', async ({ page }) => {
     await drawPolygon(page, SQUARE);
     const before = (await itemRows(page))[0]?.value;

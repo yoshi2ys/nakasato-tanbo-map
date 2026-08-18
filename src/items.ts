@@ -68,6 +68,20 @@ const KIND_ICON: Record<ItemKind, IconName> = {
   pin: DEFAULT_ICON,
 };
 
+/**
+ * 白に近い色か。一覧もパネルも地が白いので、そのままだと記号の輪郭が消える。
+ *
+ * 閾値は実測で決めた。既定の橙（#ffb300）は 0.71 で、白い地でも読める。
+ * 白（1.0）と、色見本にはない薄い黄（#ffff00 は 0.89）だけを拾いたいので 0.8 にする。
+ */
+export function isLightColor(color: string): boolean {
+  const value = color.replace('#', '');
+  const [red, green, blue] = [0, 2, 4].map((at) => parseInt(value.slice(at, at + 2), 16));
+  if (red === undefined || green === undefined || blue === undefined) return false;
+  // ITU-R BT.601 の輝度。人の目の感じ方に近い重みで、色ごとの明るさを 1 本の数にする。
+  return (0.299 * red + 0.587 * green + 0.114 * blue) / 255 > 0.8;
+}
+
 /** 一覧の行にもパネルの見出しにも、同じ記号を出す。 */
 export function itemIcon(item: Item): IconName {
   return item.kind === 'pin' ? (item.icon ?? DEFAULT_ICON) : KIND_ICON[item.kind];

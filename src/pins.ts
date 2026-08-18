@@ -1,7 +1,7 @@
 import { Marker, type Map as MapLibreMap } from 'maplibre-gl';
 import type { Vertex } from './geometry';
 import { iconSvg } from './icons';
-import { DEFAULT_ICON, type Item } from './items';
+import { DEFAULT_ICON, isLightColor, type Item } from './items';
 
 /**
  * ピンを地図に置く。
@@ -52,6 +52,8 @@ export class PinLayer {
       marker.setLngLat(position);
       const element = marker.getElement();
       element.style.color = pin.color;
+      // 白い記号は白い地に沈む。縁を付けて輪郭を残す。
+      element.classList.toggle('light', isLightColor(pin.color));
       element.title = pin.name;
       element.setAttribute('aria-label', pin.name);
       element.dataset['id'] = pin.id;
