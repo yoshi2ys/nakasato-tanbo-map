@@ -17,7 +17,7 @@ import {
   type Item,
   type ItemKind,
 } from './items';
-import { createMap, tileSources } from './map';
+import { createMap, setRotationEnabled, tileSources } from './map';
 import { MeasureLabels } from './measureLabels';
 import { applyOverlaySettings, OVERLAY_LAYER_IDS } from './overlays';
 import { PinLayer } from './pins';
@@ -93,6 +93,7 @@ export function startApp(): void {
   const listOpenButton = element<HTMLButtonElement>('list-open');
   const listCloseButton = element<HTMLButtonElement>('list-close');
   const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
+  const resetBearingButton = element<HTMLButtonElement>('reset-bearing');
   const app = element('app');
   setIcon(listOpenButton, 'list_alt');
   setIcon(listCloseButton, 'close');
@@ -348,11 +349,14 @@ export function startApp(): void {
       for (const input of modeInputs) input.checked = input.value === next;
       toolbar.hidden = next !== 'edit';
 
+      // 回転は表示のときだけ。編集に入るときは北へ戻す（頂点の上下左右が写真と揃う）。
+      setRotationEnabled(map, next === 'view');
       if (next === 'view') {
         commitEditing();
         editor.setEnabled(false);
         preview.setEnabled(false);
       } else {
+        if (map.getBearing() !== 0) map.easeTo({ bearing: 0, duration: 300 });
         editor.setEnabled(tool !== 'auto');
         preview.setEnabled(tool === 'auto');
         const item = selectedItem();
@@ -719,6 +723,19 @@ export function startApp(): void {
     map.on('idle', () => {
       if (tileSaving === null) void refreshOfflineStatus();
     });
+
+    // MARK: - 向き
+
+    /** 北を向いているあいだは出さない。狭い画面ではコンパスを出していないので、これが戻す手段になる。 */
+    function refreshBearingButton(): void {
+      resetBearingButton.hidden = map.getBearing() === 0;
+    }
+
+    resetBearingButton.addEventListener('click', () => {
+      map.easeTo({ bearing: 0, duration: 300 });
+    });
+    // rotate は回っているあいだ毎フレーム飛ぶので、easeTo で戻したときの最後も拾える。
+    map.on('rotate', refreshBearingButton);
 
     // MARK: - 起動
 

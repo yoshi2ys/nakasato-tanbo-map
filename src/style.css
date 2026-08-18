@@ -560,6 +560,25 @@ li.selected .item-name {
   color: #fff;
 }
 
+/* 回した地図を北に戻す。狭い画面ではコンパスを出していないので、これが戻す手段になる。 */
+#reset-bearing {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.92);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  font-size: calc(12px * var(--ui-scale));
+  cursor: pointer;
+}
+
+#reset-bearing[hidden] {
+  display: none;
+}
 
 #area,
 #measure {

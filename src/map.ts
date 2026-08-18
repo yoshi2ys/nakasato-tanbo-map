@@ -102,9 +102,15 @@ export function createMap(container: HTMLElement): MapLibreMap {
     zoom: INITIAL_ZOOM,
     // 十日町市の写真は z20 まであるので、地図側は 19 まで等倍で見られる。
     maxZoom: 21,
-    // 頂点編集で誤操作しないよう、回転・傾斜は無効にしておく。
+    // 回転は表示モードでだけ許す（setRotationEnabled）。編集中に回ると、頂点を掴む手が
+    // そのまま地図を回してしまう。
     dragRotate: false,
-    pitchWithRotate: false,
+    /*
+     * 傾きはどの経路でも許さない。自動検出は「真上から見た 1px が地上で何 m か」で
+     * 閾値を決めているので、傾くとその前提が崩れる。入力ごとに止めると
+     * Shift+↑（キーボード）のような経路が抜けるため、上限そのものを 0 にする。
+     */
+    maxPitch: 0,
     // 自動検出が描画結果を canvas から読み出すので、バッファを破棄させない。
     canvasContextAttributes: { preserveDrawingBuffer: true },
     attributionControl: false,
@@ -166,4 +172,23 @@ export function createMap(container: HTMLElement): MapLibreMap {
   map.addControl(new AttributionControl({ compact: false }));
 
   return map;
+}
+
+/**
+ * 回転の可否を切り替える。表示モードでだけ許す。
+ *
+ * 傾き（pitch）は createMap の maxPitch: 0 で塞いであるので、ここでは向きだけを見る。
+ * 回転は縮尺を変えないので、検出の前提は崩れない。
+ */
+export function setRotationEnabled(map: MapLibreMap, enabled: boolean): void {
+  // 指・マウス・キーボードの 3 経路。1 つでも残すと、そこからだけ回ってしまう。
+  if (enabled) {
+    map.dragRotate.enable();
+    map.touchZoomRotate.enableRotation();
+    map.keyboard.enableRotation();
+    return;
+  }
+  map.dragRotate.disable();
+  map.touchZoomRotate.disableRotation();
+  map.keyboard.disableRotation();
 }

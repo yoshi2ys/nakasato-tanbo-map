@@ -98,11 +98,23 @@ interface Capture {
   framePixels: number;
 }
 
-/** カメラと表示サイズの同一性を 1 本の文字列で比べる。 */
+/**
+ * カメラと表示サイズの同一性を 1 本の文字列で比べる。
+ *
+ * 向き（bearing）も入れる。表示モードでは回せるので、撮ってから回されたまま
+ * unproject すると、同じ画素が別の緯度経度になる。
+ */
 function cameraKey(map: MapLibreMap): string {
   const center = map.getCenter();
   const canvas = map.getCanvas();
-  return [center.lng, center.lat, map.getZoom(), canvas.width, canvas.height].join('/');
+  return [
+    center.lng,
+    center.lat,
+    map.getZoom(),
+    map.getBearing(),
+    canvas.width,
+    canvas.height,
+  ].join('/');
 }
 
 function clampInt(value: number, max: number): number {
