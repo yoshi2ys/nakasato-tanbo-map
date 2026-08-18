@@ -554,7 +554,8 @@ li.selected .item-name {
   cursor: pointer;
 }
 
-#panel-edit {
+/* 詳細度は #panel-actions button と同じだけ要る。id だけだと背景の白に負ける。 */
+#panel-actions button#panel-edit {
   border-color: #0071e3;
   background: #0071e3;
   color: #fff;
