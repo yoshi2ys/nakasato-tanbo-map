@@ -73,8 +73,9 @@ test.describe('表示と編集を行き来する', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(300);
 
+    // 並びは名前順（ja の照合ではカタカナが漢字より前）。
     const rows = await itemRows(page);
-    expect(rows.map((row) => row.kind)).toEqual(['paddy', 'measure']);
+    expect(rows.map((row) => row.kind)).toEqual(['measure', 'paddy']);
   });
 
   test('表示で選んでおくと、編集に切り替えたときそれを編集できる', async ({ page }) => {

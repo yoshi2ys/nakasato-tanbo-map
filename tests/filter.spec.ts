@@ -5,7 +5,6 @@ import {
   drawPolygon,
   itemRows,
   openApp,
-  selectRow,
   setMode,
   startEditing,
   startNew,
@@ -115,10 +114,11 @@ test.describe('一覧を絞り込む', () => {
     await page.keyboard.press('Enter');
     await page.waitForTimeout(300);
 
+    // 並びは名前順（ja の照合ではカタカナが漢字より前）。
     expect((await itemRows(page)).map((row) => row.kind)).toEqual([
-      'paddy',
-      'measure',
       'pin',
+      'measure',
+      'paddy',
       'paddy',
     ]);
     await expect(page.locator('#item-search')).toHaveValue('');
@@ -127,7 +127,8 @@ test.describe('一覧を絞り込む', () => {
 
   test('絞り込んでも選んでいるものは外れない', async ({ page }) => {
     await setMode(page, 'view');
-    await selectRow(page, 0);
+    await page.locator('#items li.item-row', { hasText: '田んぼ 1' }).locator('.item-select').click();
+    await page.waitForTimeout(500);
     await expect(page.locator('#panel')).toBeVisible();
 
     // 一覧から消えても、地図とパネルはそのまま。見ているものを勝手に手放さない。

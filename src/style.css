@@ -152,14 +152,62 @@ button {
   list-style: none;
 }
 
-#items li {
+/* フォルダの見出しと、その中の行。フォルダを使っていないうちは見出しごと出ない。 */
+.folder {
+  list-style: none;
+}
+
+.folder-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  font-size: calc(11px * var(--ui-scale));
+  font-weight: 600;
+  color: #6e6e73;
+  cursor: pointer;
+}
+
+.folder-head:hover {
+  background: #f0f0f2;
+}
+
+.folder-mark {
+  width: 10px;
+}
+
+.folder-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: #1d1d1f;
+  white-space: nowrap;
+  text-align: left;
+  text-overflow: ellipsis;
+}
+
+.folder-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.folder-items {
+  margin: 0;
+  padding: 0 0 4px 10px;
+  list-style: none;
+}
+
+#items li.item-row {
   display: flex;
   align-items: center;
   gap: 2px;
   border-radius: 8px;
 }
 
-#items li.selected {
+#items li.item-row.selected {
   background: #e8f4ff;
 }
 
@@ -1159,8 +1207,13 @@ li.selected .item-name {
   }
 
   /* 指で押す前提の寸法。一覧の行と、色やアイコンの選択肢を広げる。 */
-  #items li {
+  #items li.item-row {
     min-height: 48px;
+  }
+
+  .folder-head {
+    min-height: 44px;
+    font-size: calc(13px * var(--ui-scale));
   }
 
   #items button {

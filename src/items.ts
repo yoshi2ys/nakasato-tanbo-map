@@ -31,6 +31,8 @@ export interface Item {
   visible: boolean;
   /** pin のときだけ持つ。 */
   icon?: IconName;
+  /** 一覧でまとめる先。未設定は「未分類」。入れ子は作らない。 */
+  folder?: string;
   /** paddy: 閉じないリング（3 点以上）/ measure: 折れ線（2 点以上）/ pin: 1 点。 */
   vertices: Vertex[];
 }
@@ -42,6 +44,41 @@ const DEFAULT_COLORS: Record<ItemKind, string> = {
   measure: '#ffffff',
   pin: '#0071e3',
 };
+
+/** 未分類のフォルダの見出し。item は値を持たず、一覧のうえでだけこの名前になる。 */
+export const NO_FOLDER = '未分類';
+
+/**
+ * 名前を並べるときの比較。`numeric` を入れると `田んぼ 2` が `田んぼ 10` より前に来る。
+ * 入れないと文字として比べるので、10 が 2 より前に出る。
+ */
+const collator = new Intl.Collator('ja', { numeric: true, sensitivity: 'base' });
+
+/** 名前順。同じ名前なら作った順のままにする（並びが毎回入れ替わらないように）。 */
+export function byName(a: Item, b: Item): number {
+  return collator.compare(a.name, b.name);
+}
+
+/** フォルダ名順。未分類は最後に置く。 */
+export function byFolder(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a === NO_FOLDER) return 1;
+  if (b === NO_FOLDER) return -1;
+  return collator.compare(a, b);
+}
+
+/** 一覧でどのフォルダに入るか。持っていなければ未分類。 */
+export function folderOf(item: Item): string {
+  const folder = item.folder?.trim();
+  return folder === undefined || folder === '' ? NO_FOLDER : folder;
+}
+
+/** いま使われているフォルダ名。付け替えの候補に出す。 */
+export function folderNames(items: Item[]): string[] {
+  const names = new Set(items.map((item) => folderOf(item)));
+  names.delete(NO_FOLDER);
+  return [...names].sort(byFolder);
+}
 
 /** 一覧の絞り込みなど、種類を順に並べるときの順番。道具の並びと同じにする。 */
 export const KINDS: ItemKind[] = ['paddy', 'measure', 'pin'];
@@ -170,6 +207,7 @@ export function toGeoJSON(items: Item[]): FeatureCollection {
           color: item.color,
           visible: item.visible,
           ...(item.icon === undefined ? {} : { icon: item.icon }),
+          ...(item.folder === undefined ? {} : { folder: item.folder }),
           // 交差した輪郭に面積を書くと、受け取った側は正しい数値だと思ってしまう。
           ...(areaSquareMeters === null
             ? {}
@@ -322,6 +360,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
     const properties = feature?.properties ?? {};
     const name = properties['name'];
     const icon = properties['icon'];
+    const folder = properties['folder'];
     for (const [index, shape] of shapes.entries()) {
       // 同じ id が 2 つ並ぶと、1 つを消したつもりで両方消える。
       const wanted = typeof feature.id === 'string' && index === 0 ? feature.id : '';
@@ -336,6 +375,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
         // 保存されていなければ出す。隠されたまま戻ってくるより、出ているほうが気づける。
         visible: properties['visible'] !== false,
         ...(shape.kind === 'pin' ? { icon: isIconName(icon) ? icon : DEFAULT_ICON } : {}),
+        ...(typeof folder === 'string' && folder.trim() !== '' ? { folder: folder.trim() } : {}),
         vertices: shape.vertices,
       });
     }

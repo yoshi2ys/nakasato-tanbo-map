@@ -7,6 +7,7 @@ const SWATCHES = ['#ffb300', '#ff7043', '#e53935', '#8e24aa', '#3949ab', '#0071e
 
 export interface DetailCallbacks {
   onRename: (id: string, name: string) => void;
+  onFolder: (id: string, folder: string) => void;
   onRecolor: (id: string, color: string) => void;
   onIcon: (id: string, icon: IconName) => void;
   onDelete: (id: string) => void;
@@ -22,6 +23,8 @@ export class DetailSheet {
   readonly #root = element('detail');
   readonly #heading = element('detail-heading');
   readonly #name = element<HTMLInputElement>('detail-name');
+  readonly #folder = element<HTMLInputElement>('detail-folder');
+  readonly #folderNames = element<HTMLDataListElement>('folder-names');
   readonly #color = element<HTMLInputElement>('detail-color');
   readonly #swatches = element('detail-swatches');
   readonly #iconField = element('detail-icon-field');
@@ -40,6 +43,10 @@ export class DetailSheet {
 
     this.#name.addEventListener('input', () => {
       if (this.#item !== null) this.#callbacks.onRename(this.#item.id, this.#name.value);
+    });
+    // 打つそばから移すと、1 文字ごとにフォルダができてしまう。打ち終わりで移す。
+    this.#folder.addEventListener('change', () => {
+      if (this.#item !== null) this.#callbacks.onFolder(this.#item.id, this.#folder.value);
     });
     this.#color.addEventListener('input', () => {
       if (this.#item !== null) this.#callbacks.onRecolor(this.#item.id, this.#color.value);
@@ -85,12 +92,21 @@ export class DetailSheet {
   }
 
   /** 選んでいるものを差し替える。選択が外れたらシートも閉じる（宛先のない編集を残さない）。 */
-  render(item: Item | null): void {
+  render(item: Item | null, folders: string[]): void {
     this.#item = item;
     if (item === null) {
       this.close();
       return;
     }
+
+    this.#folderNames.replaceChildren(
+      ...folders.map((name) => {
+        const option = document.createElement('option');
+        option.value = name;
+        return option;
+      })
+    );
+    if (document.activeElement !== this.#folder) this.#folder.value = item.folder ?? '';
 
     this.#heading.textContent = `${kindLabel(item.kind)}の詳細`;
     // 打っている最中に書き戻すと、変換中の文字が消える。

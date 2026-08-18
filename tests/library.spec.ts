@@ -95,7 +95,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     await dragMap(page, [640, 390], [700, 450]);
     expect((await itemRows(page))[1]?.value).toBe(before);
 
-    await page.locator('#items li:first-child .item-select').click();
+    await page.locator('#items li.item-row:first-child .item-select').click();
     await page.waitForTimeout(700);
     expect((await itemRows(page))[0]?.selected).toBe(true);
     await expect(hint(page)).toHaveText(EDIT_HINT);
@@ -127,7 +127,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     }
 
     acceptNextDialog(page);
-    await page.locator('#items li:first-child .item-delete').click();
+    await page.locator('#items li.item-row:first-child .item-delete').click();
     await page.waitForTimeout(300);
     expect(await itemRows(page)).toHaveLength(1);
 
@@ -153,7 +153,7 @@ test.describe('複数の田んぼを持ち回る', () => {
     expect(new Set(rows.map((row) => row.name)).size).toBe(3);
 
     acceptNextDialog(page);
-    await page.locator('#items li:last-child .item-delete').click();
+    await page.locator('#items li.item-row:last-child .item-delete').click();
     await page.waitForTimeout(300);
     expect(await itemRows(page)).toHaveLength(2);
   });
@@ -185,12 +185,12 @@ test.describe('複数の田んぼを持ち回る', () => {
     await drawPolygon(page, FIRST);
 
     page.once('dialog', (dialog) => void dialog.dismiss());
-    await page.locator('#items li:first-child .item-delete').click();
+    await page.locator('#items li.item-row:first-child .item-delete').click();
     await page.waitForTimeout(300);
     expect(await itemRows(page)).toHaveLength(1);
 
     page.once('dialog', (dialog) => void dialog.accept());
-    await page.locator('#items li:first-child .item-delete').click();
+    await page.locator('#items li.item-row:first-child .item-delete').click();
     await page.waitForTimeout(300);
     expect(await itemRows(page)).toHaveLength(0);
   });

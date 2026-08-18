@@ -188,7 +188,7 @@ test.describe('地図上で距離を測る', () => {
 
     // 表示に戻ってから選び直す。現地で「あとちょっと測る」はこの入り方になる。
     await setMode(page, 'view');
-    await page.locator('#items li .item-select').first().click();
+    await page.locator('#items li.item-row .item-select').first().click();
     await page.waitForTimeout(400);
     await setMode(page, 'edit');
     await page.waitForTimeout(300);

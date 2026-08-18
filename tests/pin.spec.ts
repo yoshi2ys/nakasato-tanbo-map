@@ -82,13 +82,15 @@ test.describe('ピンを立てる', () => {
 
     await expect(pins(page)).toHaveCount(2);
     // 名前を変えたぶん「ピン 1」は空いているので、次のピンがそこに入る。
-    expect((await itemRows(page)).map((row) => row.name)).toEqual(['出入口', 'ピン 1']);
+    // 並びは名前順（ja の照合ではカタカナが漢字より前）。
+    expect((await itemRows(page)).map((row) => row.name)).toEqual(['ピン 1', '出入口']);
 
     // 表示モードでピンを押すと選べる。
     await setMode(page, 'view');
-    await pins(page).first().click();
+    await page.locator('.pin[title="出入口"]').click();
     await page.waitForTimeout(300);
-    expect((await itemRows(page))[0]?.selected).toBe(true);
+    const rows = await itemRows(page);
+    expect(rows.find((row) => row.name === '出入口')?.selected).toBe(true);
   });
 
   test('隠したピンは地図から消える', async ({ page }) => {
@@ -97,7 +99,7 @@ test.describe('ピンを立てる', () => {
     await setMode(page, 'view');
     await selectRow(page, 0);
 
-    await page.locator('#items li .item-visible').first().click();
+    await page.locator('#items li.item-row .item-visible').first().click();
     await page.waitForTimeout(300);
     await expect(pins(page)).toHaveCount(0);
   });

@@ -1,5 +1,9 @@
 import { iconSvg } from '../icons';
 import {
+  byFolder,
+  byName,
+  folderOf,
+  NO_FOLDER,
   isItemReliable,
   isLightColor,
   itemArea,
@@ -23,11 +27,14 @@ export interface SidebarCallbacks {
   onSelect: (id: string) => void;
   onToggleVisible: (id: string) => void;
   onDelete: (id: string) => void;
+  onToggleFolder: (folder: string) => void;
 }
 
 /**
- * 左の一覧。田んぼも計測もピンも、作った順に 1 本に並べる。
- * 種類ごとに分けると「さっき作ったもの」が探しにくいので、見分けはアイコンに任せる。
+ * 左の一覧。フォルダごとにまとめ、中は名前順に並べる。
+ *
+ * 種類では分けない（「さっき作ったもの」が探しにくくなる）。見分けはアイコンに任せ、
+ * 種類で絞りたいときは上の絞り込みを使う。
  */
 export class Sidebar {
   readonly #list = element<HTMLUListElement>('items');
@@ -47,6 +54,7 @@ export class Sidebar {
   #items: Item[] = [];
   #selectedId: string | null = null;
   #editingId: string | null = null;
+  #collapsed: string[] = [];
 
   constructor(callbacks: SidebarCallbacks) {
     this.#callbacks = callbacks;
@@ -57,10 +65,16 @@ export class Sidebar {
     });
   }
 
-  render(items: Item[], selectedId: string | null, editingId: string | null): void {
+  render(
+    items: Item[],
+    selectedId: string | null,
+    editingId: string | null,
+    collapsed: string[]
+  ): void {
     this.#items = items;
     this.#selectedId = selectedId;
     this.#editingId = editingId;
+    this.#collapsed = collapsed;
     this.#paint();
   }
 
@@ -79,21 +93,78 @@ export class Sidebar {
     this.#paint();
   }
 
-  /** 絞り込んだ結果を並べ直す。 */
+  /** 絞り込んだ結果を、フォルダごとに並べ直す。 */
   #paint(): void {
     this.#liveValue = null;
     this.#liveId = this.#editingId;
 
     const shown = this.#items.filter((item) => this.#matches(item));
+    const folders = new Map<string, Item[]>();
+    for (const item of shown) {
+      const folder = folderOf(item);
+      const group = folders.get(folder);
+      if (group === undefined) folders.set(folder, [item]);
+      else group.push(item);
+    }
+
+    const names = [...folders.keys()].sort(byFolder);
+    // フォルダを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても読む先が増えるだけ。
+    const flat = names.length === 1 && names[0] === NO_FOLDER;
     this.#list.replaceChildren(
-      ...shown.map((item) =>
-        this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
-      )
+      ...(flat
+        ? [...shown]
+            .sort(byName)
+            .map((item) =>
+              this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
+            )
+        : names.map((folder) => this.#folder(folder, [...folders.get(folder)!].sort(byName))))
     );
 
     this.#empty.hidden = shown.length > 0;
     // 1 つも無いのか、絞り込みで消えたのかで、次にすることが違う。
     this.#empty.textContent = this.#items.length === 0 ? NOTHING_YET : NOTHING_MATCHED;
+  }
+
+  /** フォルダ 1 つぶん。見出しを押すと畳める。 */
+  #folder(folder: string, items: Item[]): HTMLLIElement {
+    const collapsed = this.#collapsed.includes(folder);
+    const block = document.createElement('li');
+    block.className = 'folder';
+    block.dataset['folder'] = folder;
+
+    const head = document.createElement('button');
+    head.type = 'button';
+    head.className = 'folder-head';
+    head.setAttribute('aria-expanded', String(!collapsed));
+    head.addEventListener('click', () => this.#callbacks.onToggleFolder(folder));
+
+    const mark = document.createElement('span');
+    mark.className = 'folder-mark';
+    // 記号は字で出す。アイコンの一覧に矢印を足すより、向きが変わる字のほうが確か。
+    mark.textContent = collapsed ? '▸' : '▾';
+
+    const name = document.createElement('span');
+    name.className = 'folder-name';
+    name.textContent = folder;
+
+    const count = document.createElement('span');
+    count.className = 'folder-count';
+    count.textContent = String(items.length);
+
+    head.append(mark, name, count);
+    block.append(head);
+
+    if (!collapsed) {
+      const list = document.createElement('ul');
+      list.className = 'folder-items';
+      list.append(
+        ...items.map((item) =>
+          this.#row(item, item.id === this.#selectedId, item.id === this.#editingId)
+        )
+      );
+      block.append(list);
+    }
+    return block;
   }
 
   #matches(item: Item): boolean {
@@ -139,6 +210,7 @@ export class Sidebar {
 
   #row(item: Item, selected: boolean, editing: boolean): HTMLLIElement {
     const row = document.createElement('li');
+    row.className = 'item-row';
     row.classList.toggle('selected', selected);
     row.dataset['id'] = item.id;
     row.dataset['kind'] = item.kind;

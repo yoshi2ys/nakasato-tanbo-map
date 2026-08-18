@@ -13,6 +13,7 @@ import {
 import {
   ImportError,
   defaultColor,
+  folderNames,
   fromGeoJSON,
   loadStored,
   merge,
@@ -177,9 +178,25 @@ export function startApp(): void {
       onSelect: (id) => selectItem(id),
       onToggleVisible: (id) => toggleVisible(id),
       onDelete: (id) => removeItem(id),
+      onToggleFolder: (folder) => {
+        const collapsed = settings.collapsedFolders;
+        settings = {
+          ...settings,
+          collapsedFolders: collapsed.includes(folder)
+            ? collapsed.filter((name) => name !== folder)
+            : [...collapsed, folder],
+        };
+        storeSettings(settings);
+        listDirty = true;
+        render();
+      },
     });
     const detail = new DetailSheet({
       onRename: (id, name) => updateItem(id, (item) => ({ ...item, name })),
+      onFolder: (id, folder) => {
+        const trimmed = folder.trim();
+        updateItem(id, (item) => ({ ...item, folder: trimmed === '' ? undefined : trimmed }));
+      },
       onRecolor: (id, color) => {
         updateItem(id, (item) => ({ ...item, color }));
         if (id === editingId) editor.setColor(color);
@@ -480,7 +497,7 @@ export function startApp(): void {
 
       if (listDirty) {
         listDirty = false;
-        sidebar.render(items, selectedId, editingId);
+        sidebar.render(items, selectedId, editingId, settings.collapsedFolders);
       } else {
         sidebar.refreshLive(items);
       }
@@ -496,7 +513,7 @@ export function startApp(): void {
         panel.render(selected, selected !== null && selected.id === editingId, inlineFields);
       }
       // 選択が外れたら詳細のシートも閉じる。宛先のない編集欄を残さない。
-      detail.render(selected);
+      detail.render(selected, folderNames(items));
       // キーボードも右クリックもない端末のために、同じことをボタンでもできるようにする。
       const editing = mode === 'edit' && tool !== 'auto';
       finishButton.hidden = !(editing && edit.phase === 'drawing' && canFinishNow());

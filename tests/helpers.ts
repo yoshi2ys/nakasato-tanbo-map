@@ -121,7 +121,7 @@ export async function startNew(page: Page, tool: Tool = 'manual'): Promise<void>
 export async function itemRows(
   page: Page
 ): Promise<{ name: string; value: string; kind: string; selected: boolean; visible: boolean }[]> {
-  return page.$$eval('#items li', (items) =>
+  return page.$$eval('#items li.item-row', (items) =>
     items.map((li) => ({
       name: li.querySelector('.item-name')?.textContent ?? '',
       value: li.querySelector('.item-value')?.textContent ?? '',
@@ -134,13 +134,13 @@ export async function itemRows(
 
 /** 一覧の行を選ぶ。 */
 export async function selectRow(page: Page, index: number): Promise<void> {
-  await page.locator('#items li .item-select').nth(index).click();
+  await page.locator('#items li.item-row .item-select').nth(index).click();
   await page.waitForTimeout(500);
 }
 
 /** 一覧の行の表示・非表示を切り替える。 */
 export async function toggleRowVisible(page: Page, index: number): Promise<void> {
-  await page.locator('#items li .item-visible').nth(index).click();
+  await page.locator('#items li.item-row .item-visible').nth(index).click();
   await page.waitForTimeout(250);
 }
 

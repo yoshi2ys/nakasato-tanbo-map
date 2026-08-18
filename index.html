@@ -118,6 +118,13 @@
             <input id="detail-name" type="text" />
           </label>
 
+          <label class="field">
+            <span>フォルダ</span>
+            <input id="detail-folder" type="text" list="folder-names" placeholder="未分類" />
+            <!-- いま使われている名前を候補に出す。新しい名前を打てば、そのフォルダができる。 -->
+            <datalist id="folder-names"></datalist>
+          </label>
+
           <div class="field">
             <span>色</span>
             <div id="detail-colors">

@@ -58,7 +58,7 @@ test.describe('一覧から名前・色・表示を変える', () => {
   test('編集中のものは隠せない', async ({ page }) => {
     await drawPolygon(page, SQUARE);
     // 閉じた直後は編集に載っている。ここで隠すと、頂点だけが宙に浮く。
-    await expect(page.locator('#items li .item-visible').first()).toBeDisabled();
+    await expect(page.locator('#items li.item-row .item-visible').first()).toBeDisabled();
   });
 
   test('名前と色を変えると、一覧と地図と保存に載る', async ({ page }) => {
@@ -107,11 +107,11 @@ test.describe('一覧から名前・色・表示を変える', () => {
 
   test('白い記号は灰色にして、白い地でも読めるようにする', async ({ page }) => {
     await drawPolygon(page, SQUARE);
-    await expect(page.locator('#items li .item-icon')).not.toHaveClass(/light/);
+    await expect(page.locator('#items li.item-row .item-icon')).not.toHaveClass(/light/);
 
     await page.locator('.swatch[data-color="#ffffff"]').click();
     await page.waitForTimeout(300);
-    await expect(page.locator('#items li .item-icon')).toHaveClass(/light/);
+    await expect(page.locator('#items li.item-row .item-icon')).toHaveClass(/light/);
     await expect(page.locator('#panel-icon')).toHaveClass(/light/);
   });
 
