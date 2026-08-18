@@ -105,7 +105,7 @@ test.describe('一覧から名前・色・表示を変える', () => {
     await expect(page.locator('#detail-sheet #detail-name')).toBeVisible();
   });
 
-  test('白い記号は縁を付けて、白い地でも輪郭を残す', async ({ page }) => {
+  test('白い記号は灰色にして、白い地でも読めるようにする', async ({ page }) => {
     await drawPolygon(page, SQUARE);
     await expect(page.locator('#items li .item-icon')).not.toHaveClass(/light/);
 

@@ -101,8 +101,10 @@ export class Panel {
     this.#name.textContent = item.name;
     this.#name.title = `${kindLabel(item.kind)}：${item.name}`;
     this.#icon.replaceChildren(iconSvg(itemIcon(item), 16));
-    this.#icon.style.color = item.color;
-    this.#icon.classList.toggle('light', isLightColor(item.color));
+    // 白い記号は白い地に沈む。その色だけは CSS に任せて灰色にする。
+    const light = isLightColor(item.color);
+    this.#icon.classList.toggle('light', light);
+    this.#icon.style.color = light ? '' : item.color;
 
     this.#showMetrics(itemArea(item), itemLength(item), isItemReliable(item));
 

@@ -150,9 +150,10 @@ export class Sidebar {
 
     const icon = document.createElement('span');
     icon.className = 'item-icon';
-    icon.style.color = item.color;
-    // 白い記号は白い地に沈む。縁を付けて輪郭を残す。
-    icon.classList.toggle('light', isLightColor(item.color));
+    // 白い記号は白い地に沈む。その色だけは CSS に任せて灰色にする。
+    const light = isLightColor(item.color);
+    icon.classList.toggle('light', light);
+    icon.style.color = light ? '' : item.color;
     icon.append(iconSvg(itemIcon(item), 16));
 
     const name = document.createElement('span');
