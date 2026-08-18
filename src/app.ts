@@ -312,6 +312,9 @@ export function startApp(): void {
       // ここを飛ばすと、ドラッグや継ぎ足しのあいだ行の数値が古いまま止まる。
       listDirty = true;
       editor.load(KIND_SHAPE[item.kind], item.vertices, item.color);
+      // 計測を選んで編集に入るのは、たいてい続きを測りたいとき。そのまま継ぎ足せる状態にする。
+      // 置いた点は継ぎ足し中でも掴めるので、動かしたいだけのときも困らない。
+      if (item.kind === 'measure') editor.resume();
       if (item.kind === 'pin') pinLayer.setDraggable(item.id, (position) => movePin(item.id, position));
     }
 

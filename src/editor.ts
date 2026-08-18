@@ -117,6 +117,12 @@ export class ItemEditor {
   #selfIntersecting = false;
   #enabled = true;
   readonly #onRestart: () => void;
+  /** 継ぎ足しを始める前の形。「やめる」で戻す先になる。 */
+  #resumedFrom: Vertex[] | null = null;
+  /** 直後の click を捨てるか。頂点を掴んで離した手が、そのまま次の点を置かないように。 */
+  #swallowNextClick = false;
+  /** 掴んでから実際に動いたか。動いていなければ、その click は掴む前と同じ意味を持つ。 */
+  #dragMoved = false;
   /** 予約済みの再描画フレーム。mousemove ごとの再構築を 1 フレームにまとめる。 */
   #pendingFrame: number | null = null;
 
@@ -202,6 +208,7 @@ export class ItemEditor {
     this.#kind = kind;
     this.#color = color;
     this.#applyColor();
+    this.#resumedFrom = null;
     this.#phase = 'drawing';
     this.#vertices = [];
     this.#cursor = null;
@@ -239,6 +246,11 @@ export class ItemEditor {
   // MARK: - 描画
 
   #handleClick = (event: MapMouseEvent): void => {
+    // 頂点を掴んで離した手。ここで点を足すと、掴んだ場所に重ねて置くことになる。
+    if (this.#swallowNextClick) {
+      this.#swallowNextClick = false;
+      return;
+    }
     if (this.#phase === 'editing') {
       const hit = this.#hitTest(event.point);
       /*
@@ -295,6 +307,8 @@ export class ItemEditor {
    */
   resume(): void {
     if (this.#kind !== 'line' || this.#phase !== 'editing') return;
+    // 「やめる」で継ぎ足す前に戻れるよう、いまの形を控える。
+    this.#resumedFrom = this.#vertices.map((vertex) => [...vertex] satisfies Vertex);
     this.#phase = 'drawing';
     this.#selected = null;
     this.#endDrag();
@@ -308,9 +322,24 @@ export class ItemEditor {
 
   /**
    * 描きかけを捨てる。Esc と同じ働きで、キーボードのない端末のために外から呼べる。
+   *
+   * 継ぎ足している最中は、捨てるのは継ぎ足したぶんだけ。もとからあった線まで消すと、
+   * 保存済みのものが地図から消えたように見える。
    */
   discard(): void {
-    this.begin(this.#kind, this.#color);
+    const before = this.#resumedFrom;
+    if (before === null) {
+      this.begin(this.#kind, this.#color);
+      return;
+    }
+    this.#resumedFrom = null;
+    this.#vertices = before;
+    this.#phase = 'editing';
+    this.#cursor = null;
+    this.#selected = null;
+    this.#endDrag();
+    this.#setCursor('');
+    this.#commitVertices();
   }
 
   /** 選んでいる頂点を消す。右クリックや Delete の代わりに、ボタンからも呼べる。 */
@@ -327,6 +356,7 @@ export class ItemEditor {
   /** 頂点が足りていれば確定して編集に移る。 */
   #close(): void {
     if (this.#phase === 'editing' || !this.#canClose()) return;
+    this.#resumedFrom = null;
     this.#phase = 'editing';
     this.#cursor = null;
     this.#setCursor('');
@@ -350,10 +380,10 @@ export class ItemEditor {
     // 主ボタン以外は掴まない。右ボタンで preventDefault すると MapLibre が続く
     // contextmenu を握り潰す。macOS の ctrl + クリックも右クリック扱いなので外す。
     const mouse = event.originalEvent;
-    if (this.#phase !== 'editing' || mouse.button !== 0 || mouse.ctrlKey) return;
+    if (mouse.button !== 0 || mouse.ctrlKey) return;
 
     const hit = this.#hitTest(event.point);
-    if (hit === null) return;
+    if (hit === null || !this.#canGrab(hit)) return;
 
     // 掴んでいるあいだ地図をパンさせない。
     event.preventDefault();
@@ -367,6 +397,7 @@ export class ItemEditor {
     }
 
     this.#selected = this.#dragging;
+    this.#dragMoved = false;
     this.#map.on('mousemove', this.#handleDragMove);
     // 地図の外（パネルの上やウィンドウの外）で離しても掴みっぱなしにならないよう、
     // map ではなく window で mouseup を待つ。
@@ -381,11 +412,11 @@ export class ItemEditor {
    * ドラッグは touch のまま来る。2 本指は地図の拡大縮小なので手を出さない。
    */
   #handleTouchStart = (event: MapTouchEvent): void => {
-    if (this.#phase !== 'editing' || event.points.length > 1) return;
+    if (event.points.length > 1) return;
 
     this.#touching = true;
     const hit = this.#hitTest(event.point);
-    if (hit === null) {
+    if (hit === null || !this.#canGrab(hit)) {
       this.#touching = false;
       return;
     }
@@ -401,15 +432,28 @@ export class ItemEditor {
     }
 
     this.#selected = this.#dragging;
+    this.#dragMoved = false;
     this.#map.on('touchmove', this.#handleTouchMove);
     this.#map.once('touchend', this.#handleTouchEnd);
     this.#map.once('touchcancel', this.#handleTouchEnd);
     this.#commitVertices();
   };
 
+  /**
+   * その当たりを掴めるか。
+   *
+   * 確定後はどれでも掴める。継ぎ足している最中（線を描いている途中）は、すでに置いた頂点だけ。
+   * 面の描画中に掴ませると、開始点をクリックして閉じる操作と取り合いになる。
+   */
+  #canGrab(hit: { role: 'vertex' | 'ghost'; index: number }): boolean {
+    if (this.#phase === 'editing') return true;
+    return this.#kind === 'line' && hit.role === 'vertex';
+  }
+
   #handleTouchMove = (event: MapTouchEvent): void => {
     if (this.#dragging === null) return;
     event.preventDefault();
+    this.#dragMoved = true;
     this.#vertices[this.#dragging] = event.lngLat.toArray();
     this.#commitVertices(true);
   };
@@ -431,12 +475,15 @@ export class ItemEditor {
       return;
     }
 
+    this.#dragMoved = true;
     this.#vertices[this.#dragging] = event.lngLat.toArray();
     this.#commitVertices(true);
   };
 
   #handleDragEnd = (): void => {
     if (this.#dragging === null) return;
+    // 掴んだだけで動いていないなら、その click は掴む前と同じ意味（確定や点の追加）を持つ。
+    this.#swallowNextClick = this.#phase === 'drawing' && this.#dragMoved;
     this.#endDrag();
     this.#render();
   };

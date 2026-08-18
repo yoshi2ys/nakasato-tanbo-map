@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   clickMap,
   collectErrors,
+  dragMap,
   EDIT_HINT_MIN,
   hint,
   itemRows,
@@ -192,8 +193,8 @@ test.describe('地図上で距離を測る', () => {
     await setMode(page, 'edit');
     await page.waitForTimeout(300);
 
-    await expect(page.locator('#extend-line')).toBeVisible();
-    await page.locator('#extend-line').click();
+    // 選んで編集に入った時点で継ぎ足せる。ボタンを探させない。
+    await expect(hint(page)).toHaveText('点を継ぎ足して、「確定」で終了（「やめる」で消去）');
     await clickMap(page, 500, 400);
     await page.keyboard.press('Enter');
     await page.waitForTimeout(400);
@@ -202,6 +203,44 @@ test.describe('地図上で距離を測る', () => {
     const rows = await itemRows(page);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.value).not.toBe(before);
+  });
+
+  test('継ぎ足しをやめても、もとの線は残る', async ({ page }) => {
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    const before = (await itemRows(page))[0]?.value;
+
+    await page.locator('#extend-line').click();
+    await clickMap(page, 500, 450);
+    await page.waitForTimeout(200);
+    await page.locator('#discard-draw').click();
+    await page.waitForTimeout(400);
+
+    // 消えるのは継ぎ足したぶんだけ。保存済みの線まで消してはいけない。
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.value).toBe(before);
+    await expect(page.locator('.measure-label')).toHaveCount(1);
+  });
+
+  test('継ぎ足している最中でも、置いた点を動かせる', async ({ page }) => {
+    await clickMap(page, 400, 300);
+    await clickMap(page, 500, 300);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(300);
+    await page.locator('#extend-line').click();
+    await page.waitForTimeout(200);
+
+    // 掴んで離した手が、そのまま次の点を置いてしまわないことも見る。
+    await dragMap(page, [400, 300], [400, 400]);
+    await page.keyboard.press('Enter');
+    await page.waitForTimeout(400);
+
+    const rows = await itemRows(page);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.value).not.toBe(HORIZONTAL_100PX);
   });
 
   test('面には継ぎ足しを出さない', async ({ page }) => {
