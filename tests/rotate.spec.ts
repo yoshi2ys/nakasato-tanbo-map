@@ -47,6 +47,9 @@ test.describe('地図の向き', () => {
     }
     await page.waitForTimeout(500);
     expect(await bearing(page)).toBe(0);
+
+    // コンパスはつまんで回せる（maplibre が map.setBearing を直に呼ぶ）ので、出ていないこと。
+    await expect(page.locator('.maplibregl-ctrl-compass')).toBeHidden();
   });
 
   test('傾きはどのモードでも付かない', async ({ page }) => {
@@ -72,15 +75,14 @@ test.describe('地図の向き', () => {
     expect(await bearing(page)).toBe(0);
   });
 
-  test('回っているあいだだけ「北に戻す」が出る', async ({ page }) => {
-    await expect(page.locator('#reset-bearing')).toBeHidden();
+  test('コンパスを押すと北へ戻る', async ({ page }) => {
     await rotateDrag(page);
-    await expect(page.locator('#reset-bearing')).toBeVisible();
+    expect(Math.abs(await bearing(page))).toBeGreaterThan(5);
 
-    await page.locator('#reset-bearing').click();
-    await page.waitForTimeout(600);
+    await page.locator('.maplibregl-ctrl-compass').click();
+    // MapLibre の resetNorth は 1 秒かけて戻す（既定値）。待ちはそれより長く取る。
+    await page.waitForTimeout(1200);
     expect(await bearing(page)).toBe(0);
-    await expect(page.locator('#reset-bearing')).toBeHidden();
   });
 
   test('回したあとに描いても、頂点は指した場所に落ちる', async ({ page }) => {

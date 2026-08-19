@@ -721,11 +721,6 @@ li.selected .item-name {
   display: none;
 }
 
-/* 北に戻すボタンと並ぶときは、そのぶん下げる。 */
-#stage:has(#reset-bearing:not([hidden])) #image-open {
-  top: 52px;
-}
-
 /*
  * 切り取る枠。中は素通しにして、地図をそのまま動かせるようにする。
  * 外側は枠の影で暗くする（別に覆いを敷くと、その覆いがクリックを奪う）。
@@ -849,23 +844,8 @@ li.selected .item-name {
   cursor: default;
 }
 
-/* 回した地図を北に戻す。狭い画面ではコンパスを出していないので、これが戻す手段になる。 */
-#reset-bearing {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
-  padding: 7px 12px;
-  border: 0;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.92);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
-  font-size: calc(12px * var(--ui-scale));
-  cursor: pointer;
-}
-
-#reset-bearing[hidden] {
+/* 回せないあいだ（編集中）はコンパスを出さない。出ているとつまんで回せてしまう。 */
+.no-rotate .maplibregl-ctrl-compass {
   display: none;
 }
 
@@ -1237,15 +1217,10 @@ li.selected .item-name {
     font-size: calc(14px * var(--ui-scale));
   }
 
-  #reset-bearing,
   #image-open {
     top: max(8px, env(safe-area-inset-top));
     padding: 0 16px;
     font-size: calc(13px * var(--ui-scale));
-  }
-
-  #stage:has(#reset-bearing:not([hidden])) #image-open {
-    top: max(60px, calc(env(safe-area-inset-top) + 52px));
   }
 
   /* 幅が足りないので、選ぶものを 2 段に折り返す。 */
@@ -1272,8 +1247,25 @@ li.selected .item-name {
     transform: translateY(100%);
   }
 
-  /* ズームとコンパスは指でつまめるので出さない。縮尺は残す。 */
-  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-group {
+  /* ズームは指でつまめるので出さない。回した向きを戻す手段が要るので、コンパスは残す。 */
+  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-zoom-in,
+  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-zoom-out {
+    display: none;
+  }
+
+  /* 指で押せる大きさにする（既定の 29px 角では小さい）。 */
+  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-compass {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* 画面の下端は home indicator のジェスチャー帯。そこに入ったボタンは押せない。 */
+  .maplibregl-ctrl-bottom-left {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* 編集のあいだはコンパスも消えるので、空の枠だけが残らないように箱ごと隠す。 */
+  .no-rotate .maplibregl-ctrl-bottom-left .maplibregl-ctrl-group {
     display: none;
   }
 
@@ -1353,7 +1345,6 @@ li.selected .item-name {
   #kind-filters label,
   #library-actions button,
   #offline-actions button,
-  #reset-bearing,
   .icon-choice {
     display: flex;
     align-items: center;

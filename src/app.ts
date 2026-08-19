@@ -106,7 +106,6 @@ export function startApp(): void {
   const listOpenButton = element<HTMLButtonElement>('list-open');
   const listCloseButton = element<HTMLButtonElement>('list-close');
   const settingsOnMapButton = element<HTMLButtonElement>('settings-open-map');
-  const resetBearingButton = element<HTMLButtonElement>('reset-bearing');
   const panelFields = element('panel-fields');
   const imageOpenButton = element<HTMLButtonElement>('image-open');
   const groupAddButton = element<HTMLButtonElement>('group-add');
@@ -918,19 +917,6 @@ export function startApp(): void {
         render();
       }
     }
-
-    // MARK: - 向き
-
-    /** 北を向いているあいだは出さない。狭い画面ではコンパスを出していないので、これが戻す手段になる。 */
-    function refreshBearingButton(): void {
-      resetBearingButton.hidden = map.getBearing() === 0;
-    }
-
-    resetBearingButton.addEventListener('click', () => {
-      map.easeTo({ bearing: 0, duration: 300 });
-    });
-    // rotate は回っているあいだ毎フレーム飛ぶので、easeTo で戻したときの最後も拾える。
-    map.on('rotate', refreshBearingButton);
 
     // MARK: - 起動
 

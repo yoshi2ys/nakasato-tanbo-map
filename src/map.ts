@@ -114,6 +114,8 @@ export function createMap(container: HTMLElement): MapLibreMap {
     // 自動検出が描画結果を canvas から読み出すので、バッファを破棄させない。
     canvasContextAttributes: { preserveDrawingBuffer: true },
     attributionControl: false,
+    // コンパスが北へ戻す唯一の手段なので、説明は日本語で出す（既定は英語）。
+    locale: { 'NavigationControl.ResetBearing': '北に戻す' },
     style: {
       version: 8,
       sources: {
@@ -181,7 +183,12 @@ export function createMap(container: HTMLElement): MapLibreMap {
  * 回転は縮尺を変えないので、検出の前提は崩れない。
  */
 export function setRotationEnabled(map: MapLibreMap, enabled: boolean): void {
-  // 指・マウス・キーボードの 3 経路。1 つでも残すと、そこからだけ回ってしまう。
+  /*
+   * 指・マウス・キーボードの 3 経路。1 つでも残すと、そこからだけ回ってしまう。
+   * コンパスは 4 つめの経路で、つまんで回すと maplibre が map.setBearing を直に呼ぶ
+   * （上の 3 つを止めても効く）。止める口がないので、回せないあいだは出さない。
+   */
+  map.getContainer().classList.toggle('no-rotate', !enabled);
   if (enabled) {
     map.dragRotate.enable();
     map.touchZoomRotate.enableRotation();
