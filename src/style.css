@@ -1247,6 +1247,11 @@ li.selected .item-name {
     transform: translateY(100%);
   }
 
+  /* 設定への入り口は地図の歯車だけにする。見出しにも置くと、同じ的が 2 つに見える。 */
+  #settings-open {
+    display: none;
+  }
+
   /* 指で押せる大きさにする（既定の 29px 角では小さい）。 */
   .maplibregl-ctrl-bottom-left .maplibregl-ctrl-group button {
     width: 44px;
@@ -1311,7 +1316,6 @@ li.selected .item-name {
   }
 
   /* シートの見出しに並ぶボタン。指の的として 44px 角を確保する。 */
-  #settings-open,
   #list-close,
   #panel-close,
   #detail-close,
