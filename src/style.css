@@ -1247,14 +1247,8 @@ li.selected .item-name {
     transform: translateY(100%);
   }
 
-  /* ズームは指でつまめるので出さない。回した向きを戻す手段が要るので、コンパスは残す。 */
-  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-zoom-in,
-  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-zoom-out {
-    display: none;
-  }
-
   /* 指で押せる大きさにする（既定の 29px 角では小さい）。 */
-  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-compass {
+  .maplibregl-ctrl-bottom-left .maplibregl-ctrl-group button {
     width: 44px;
     height: 44px;
   }
@@ -1262,11 +1256,6 @@ li.selected .item-name {
   /* 画面の下端は home indicator のジェスチャー帯。そこに入ったボタンは押せない。 */
   .maplibregl-ctrl-bottom-left {
     padding-bottom: env(safe-area-inset-bottom);
-  }
-
-  /* 編集のあいだはコンパスも消えるので、空の枠だけが残らないように箱ごと隠す。 */
-  .no-rotate .maplibregl-ctrl-bottom-left .maplibregl-ctrl-group {
-    display: none;
   }
 
   #list-open,
