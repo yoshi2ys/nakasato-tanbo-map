@@ -223,6 +223,23 @@ button {
   box-shadow: inset 0 0 0 1px #0071e3;
 }
 
+.group-head[draggable='true'] {
+  cursor: grab;
+}
+
+.group-head.dragging {
+  opacity: 0.4;
+}
+
+/* 落ちる先を線で見せる。行のときと同じ見え方にそろえる。 */
+.group-head.drop-before {
+  box-shadow: inset 0 2px 0 #0071e3;
+}
+
+.group-head.drop-after {
+  box-shadow: inset 0 -2px 0 #0071e3;
+}
+
 .group-remove {
   display: flex;
   flex: none;

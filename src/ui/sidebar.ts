@@ -1,6 +1,5 @@
 import { iconSvg } from '../icons';
 import {
-  byGroup,
   byListOrder,
   groupOf,
   NO_GROUP,
@@ -11,6 +10,7 @@ import {
   itemLength,
   kindLabel,
   KINDS,
+  orderGroups,
   type Item,
   type ItemKind,
 } from '../items';
@@ -33,7 +33,15 @@ export interface SidebarCallbacks {
   onRemoveGroup: (group: string) => void;
   /** グループの中身を並べ直す。並んだ順の id を渡す（移してきた行も含む）。 */
   onReorder: (group: string, orderedIds: string[]) => void;
+  /** グループそのものを並べ直す。並んだ順の名前を渡す（未分類は入らない）。 */
+  onReorderGroups: (orderedNames: string[]) => void;
 }
+
+/**
+ * 掴んでいるのがグループかどうかを、dataTransfer の型で見分ける。
+ * dragover では getData が空を返す決まりなので、中身では判定できない。
+ */
+const GROUP_DRAG_TYPE = 'application/x-group';
 
 /**
  * 左の一覧。グループごとにまとめ、中は名前順に並べる。
@@ -62,6 +70,8 @@ export class Sidebar {
   #collapsed: string[] = [];
   /** 中身が空でも出すグループ。設定に持っている「作ったグループ」。 */
   #groups: string[] = [];
+  /** 手で並べたグループの並び。ここに無い名前は名前順で後ろに続く。 */
+  #groupOrder: string[] = [];
 
   constructor(callbacks: SidebarCallbacks) {
     this.#callbacks = callbacks;
@@ -77,13 +87,15 @@ export class Sidebar {
     selectedId: string | null,
     editingId: string | null,
     collapsed: string[],
-    groups: string[]
+    groups: string[],
+    groupOrder: string[]
   ): void {
     this.#items = items;
     this.#selectedId = selectedId;
     this.#editingId = editingId;
     this.#collapsed = collapsed;
     this.#groups = groups;
+    this.#groupOrder = groupOrder;
     this.#paint();
   }
 
@@ -118,7 +130,7 @@ export class Sidebar {
 
     // 作っただけでまだ空のグループも見出しを出す。入れる先が見えないと移しようがない。
     for (const name of this.#groups) if (!groups.has(name)) groups.set(name, []);
-    const names = [...groups.keys()].sort(byGroup);
+    const names = orderGroups([...groups.keys()], this.#groupOrder);
     // グループを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても読む先が増えるだけ。
     const flat = names.length === 1 && names[0] === NO_GROUP;
     this.#list.replaceChildren(
@@ -149,17 +161,47 @@ export class Sidebar {
     head.setAttribute('aria-expanded', String(!collapsed));
     head.addEventListener('click', () => this.#callbacks.onToggleGroup(group));
 
-    // 行をここへ落として移す。指では掴めないので、マウスのある画面のための道。
+    /*
+     * 見出しは 2 つの落とし先を兼ねる。行を落とせばそのグループへ移し、
+     * 見出しを落とせばグループの並びを入れ替える。指では掴めないので、
+     * どちらもマウスのある画面のための道。
+     */
+    if (group !== NO_GROUP) {
+      // 未分類は掴めない。作ったグループではないので、並びの中に居場所がない。
+      head.draggable = true;
+      head.addEventListener('dragstart', (event) => {
+        event.dataTransfer?.setData(GROUP_DRAG_TYPE, group);
+        if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
+        head.classList.add('dragging');
+      });
+      head.addEventListener('dragend', () => head.classList.remove('dragging'));
+    }
+
     head.addEventListener('dragover', (event) => {
       if (event.dataTransfer === null) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
-      head.classList.add('drop-target');
+      if (!event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) {
+        head.classList.add('drop-target');
+        return;
+      }
+      // 未分類は常に最後なので、その手前にしか入れない。
+      const before = group === NO_GROUP || this.#beforeHalf(head, event);
+      head.classList.toggle('drop-before', before);
+      head.classList.toggle('drop-after', !before);
     });
-    head.addEventListener('dragleave', () => head.classList.remove('drop-target'));
+    head.addEventListener('dragleave', () => {
+      head.classList.remove('drop-target', 'drop-before', 'drop-after');
+    });
     head.addEventListener('drop', (event) => {
       event.preventDefault();
-      head.classList.remove('drop-target');
+      const before = group === NO_GROUP || this.#beforeHalf(head, event);
+      head.classList.remove('drop-target', 'drop-before', 'drop-after');
+      const dragged = event.dataTransfer?.getData(GROUP_DRAG_TYPE) ?? '';
+      if (dragged !== '') {
+        if (dragged !== group) this.#reorderGroups(dragged, group, before);
+        return;
+      }
       const id = event.dataTransfer?.getData('text/plain') ?? '';
       if (id !== '') this.#callbacks.onMoveToGroup(id, group === NO_GROUP ? '' : group);
     });
@@ -202,6 +244,26 @@ export class Sidebar {
       block.append(list);
     }
     return block;
+  }
+
+  /** 落とした場所が相手の上半分か。前に入れるか後ろに入れるかの分かれ目。 */
+  #beforeHalf(element: HTMLElement, event: DragEvent): boolean {
+    const box = element.getBoundingClientRect();
+    return event.clientY < box.top + box.height / 2;
+  }
+
+  /**
+   * 落とされた見出しを、相手の隣に入れた並びにして知らせる。
+   * 並びは画面に出ている順から作る（畳んでいても見出しは出ている）。
+   */
+  #reorderGroups(dragged: string, target: string, before: boolean): void {
+    const names = [...this.#list.querySelectorAll<HTMLElement>('li.group')]
+      .map((block) => block.dataset['group'] ?? '')
+      .filter((name) => name !== '' && name !== NO_GROUP && name !== dragged);
+    const at = names.indexOf(target) + (before ? 0 : 1);
+    // 相手が未分類なら、その手前——つまり並びの末尾に入る。
+    names.splice(at < 0 ? names.length : at, 0, dragged);
+    this.#callbacks.onReorderGroups(names);
   }
 
   /** 落とされた行を、相手の隣に入れた並びにして知らせる。 */
@@ -279,6 +341,8 @@ export class Sidebar {
       if (event.dataTransfer === null) return;
       event.preventDefault();
       event.dataTransfer.dropEffect = 'move';
+      // 見出しを掴んでいるあいだは、行に入る線を出さない（行には落とせない）。
+      if (event.dataTransfer.types.includes(GROUP_DRAG_TYPE)) return;
       const box = row.getBoundingClientRect();
       const before = event.clientY < box.top + box.height / 2;
       row.classList.toggle('drop-before', before);

@@ -75,6 +75,20 @@ export function byListOrder(a: Item, b: Item): number {
   return byName(a, b);
 }
 
+/**
+ * 一覧に出すグループの並び。手で並べた順が先、それ以外は名前順で続き、未分類は最後。
+ * 書き出す groupOrder もここを通すので、ファイルの並びは画面の並びと同じになる。
+ */
+export function orderGroups(names: string[], order: string[]): string[] {
+  const at = new Map(order.map((name, index) => [name, index]));
+  return [...names].sort((a, b) => {
+    const left = at.get(a) ?? Number.POSITIVE_INFINITY;
+    const right = at.get(b) ?? Number.POSITIVE_INFINITY;
+    if (a === NO_GROUP || b === NO_GROUP || left === right) return byGroup(a, b);
+    return left - right;
+  });
+}
+
 /** グループ名順。未分類は最後に置く。 */
 export function byGroup(a: string, b: string): number {
   if (a === b) return 0;
@@ -205,10 +219,21 @@ function geometryOf(item: Item, counterClockwise: boolean): Geometry {
   };
 }
 
+/**
+ * 書き出しに使うファイル。
+ * `groupOrder` は RFC 7946 が認めている追加メンバー（知らない読み手は無視してよい）。
+ */
+export interface PaddiesFile extends FeatureCollection {
+  /** グループの並び。手で並べた順に並ぶ。未分類は入れない（常に最後なので）。 */
+  groupOrder?: string[];
+}
+
 /** 保存と書き出しに使う GeoJSON。名前・色・表示の有無まで載せる。 */
-export function toGeoJSON(items: Item[]): FeatureCollection {
+export function toGeoJSON(items: Item[], groupOrder: string[] = []): PaddiesFile {
   return {
     type: 'FeatureCollection',
+    // 空の配列を書くと「並びを指定した」と読めてしまうので、あるときだけ載せる。
+    ...(groupOrder.length === 0 ? {} : { groupOrder }),
     features: items.map((item) => {
       const reliable = isItemReliable(item);
       const areaSquareMeters = itemArea(item);
@@ -351,7 +376,11 @@ function readColor(value: unknown, kind: ItemKind): string {
  * GeoJSON を読み込む。取り込めなかった feature は黙って捨てず、件数で知らせる。
  * 1 つも取れなければ ImportError。id は必ず一意にして返す。
  */
-export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
+export function fromGeoJSON(text: string): {
+  items: Item[];
+  skipped: number;
+  groupOrder: string[];
+} {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -359,9 +388,14 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
     throw new ImportError('GeoJSON として読めませんでした');
   }
 
-  const collection = parsed as FeatureCollection;
+  const collection = parsed as PaddiesFile;
   const features = Array.isArray(collection?.features) ? collection.features : null;
   if (features === null) throw new ImportError('FeatureCollection ではありません');
+
+  // 壊れた値で一覧が出なくなるより、並びの指定が無いものとして扱うほうがまし。
+  const groupOrder = Array.isArray(collection.groupOrder)
+    ? collection.groupOrder.filter((name): name is string => typeof name === 'string')
+    : [];
 
   const items: Item[] = [];
   const ids = new Set<string>();
@@ -402,7 +436,7 @@ export function fromGeoJSON(text: string): { items: Item[]; skipped: number } {
   }
 
   if (items.length === 0) throw new ImportError('取り込めるものがありませんでした');
-  return { items, skipped };
+  return { items, skipped, groupOrder };
 }
 
 /**
@@ -441,7 +475,10 @@ export function loadStored(): Item[] {
   }
 }
 
-/** 保存できたかを返す。書けないまま「保存済み」と見せないため、失敗は呼び出し側に伝える。 */
+/**
+ * 保存できたかを返す。書けないまま「保存済み」と見せないため、失敗は呼び出し側に伝える。
+ * グループの並びは書かない。読み返すのは設定側なので、ここに写しても誰も見ない。
+ */
 export function store(items: Item[]): boolean {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toGeoJSON(items)));

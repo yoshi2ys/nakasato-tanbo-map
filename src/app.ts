@@ -14,6 +14,7 @@ import {
   ImportError,
   defaultColor,
   groupNames,
+  orderGroups,
   NO_GROUP,
   fromGeoJSON,
   loadStored,
@@ -198,6 +199,13 @@ export function startApp(): void {
         scheduleStore();
         render();
       },
+      onReorderGroups: (orderedNames) => {
+        // 並びは手で並べたときだけ書く。作っただけの名前を混ぜると、名前順が消える。
+        settings = { ...settings, groupOrder: orderedNames };
+        storeSettings(settings);
+        listDirty = true;
+        render();
+      },
       onRemoveGroup: (group) => {
         settings = {
           ...settings,
@@ -271,6 +279,15 @@ export function startApp(): void {
     offlineClearButton.addEventListener('click', () => void clearSavedTiles());
 
     // MARK: - 保存
+
+    /**
+     * いま一覧に出ているグループを、出ている順に並べたもの。書き出す GeoJSON にも
+     * これを載せるので、ファイルの並びは画面の並びと同じになる。
+     */
+    function groupOrder(): string[] {
+      const names = new Set([...groupNames(items), ...settings.groups]);
+      return orderGroups([...names], settings.groupOrder);
+    }
 
     /** 保存に失敗したら黙って続けない。保存できていないのに保存済みだと思わせるのが一番まずい。 */
     function persist(): void {
@@ -541,7 +558,8 @@ export function startApp(): void {
           selectedId,
           editingId,
           settings.collapsedGroups,
-          settings.groups
+          settings.groups,
+          settings.groupOrder
         );
       } else {
         sidebar.refreshLive(items);
@@ -729,7 +747,7 @@ export function startApp(): void {
     // MARK: - 書き出しと読み込み
 
     exportButton.addEventListener('click', () => {
-      const blob = new Blob([JSON.stringify(toGeoJSON(items), null, 2)], {
+      const blob = new Blob([JSON.stringify(toGeoJSON(items, groupOrder()), null, 2)], {
         type: 'application/geo+json',
       });
       const url = URL.createObjectURL(blob);
@@ -757,7 +775,7 @@ export function startApp(): void {
       selectedId = null;
       editingId = null;
       commitEditing();
-      settings = { ...settings, groups: [], collapsedGroups: [] };
+      settings = { ...settings, groups: [], collapsedGroups: [], groupOrder: [] };
       storeSettings(settings);
       notice = null;
       persist();
@@ -775,6 +793,19 @@ export function startApp(): void {
       detection = { status: 'idle' };
       try {
         const imported = fromGeoJSON(await file.text());
+        /*
+         * 手元の並びが先。ファイルで初めて出てきたグループだけ、ファイルの順で末尾に足す。
+         * 取り込みは「足す」動作なので、並びも足すだけにする（上書きすると手元の並びが消える）。
+         */
+        const known = groupOrder();
+        const added: string[] = [];
+        for (const name of imported.groupOrder) {
+          // 未分類は並びを持たない（常に最後）。同じ名前が 2 度出てくるファイルもある。
+          if (name === NO_GROUP || known.includes(name) || added.includes(name)) continue;
+          added.push(name);
+        }
+        settings = { ...settings, groupOrder: [...known, ...added] };
+        storeSettings(settings);
         // 取り込んだものは別のものとして足す。既存を消したいときは一覧から削除する。
         items = merge(items, imported.items);
         commitEditing();

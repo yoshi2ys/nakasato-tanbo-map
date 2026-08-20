@@ -1,8 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import {
   clickMap,
   collectErrors,
   drawPolygon,
+  exportGeoJSON,
   itemRows,
   openApp,
   setMode,
@@ -23,6 +27,30 @@ const OTHER: [number, number][] = [
   [1050, 580],
   [900, 580],
 ];
+
+/** 空のグループを作る。名前はダイアログで聞かれる。 */
+async function addGroup(page: import('@playwright/test').Page, name: string): Promise<void> {
+  page.once('dialog', (dialog) => void dialog.accept(name));
+  await page.locator('#group-add').click();
+  await page.waitForTimeout(300);
+}
+
+/** 見出しを掴んで、相手の見出しの上半分に落とす（＝相手の前に入る）。 */
+async function dragGroup(
+  page: import('@playwright/test').Page,
+  from: string,
+  to: string
+): Promise<void> {
+  await page.dragAndDrop(`.group-head:has-text("${from}")`, `.group-head:has-text("${to}")`, {
+    targetPosition: { x: 40, y: 2 },
+  });
+  await page.waitForTimeout(400);
+}
+
+/** 見出しに出ているグループ名を、並んでいる順に読む。 */
+function groupNames(page: import('@playwright/test').Page): Promise<string[]> {
+  return page.locator('.group-name').allTextContents();
+}
 
 /** いま選んでいるものをグループへ移す。欄は編集中ならパネルの中にある。 */
 async function moveToGroup(page: import('@playwright/test').Page, name: string): Promise<void> {
@@ -174,6 +202,53 @@ test.describe('一覧をグループでまとめる', () => {
     await expect(page.locator('#mode input[value="edit"]')).toBeEnabled({ timeout: 60_000 });
     await page.waitForTimeout(1500);
     expect((await itemRows(page)).map((row) => row.name)).toEqual(['い', 'あ']);
+  });
+
+  test('グループを手で並べ替えられる。未分類は最後のまま', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await addGroup(page, 'い');
+    await addGroup(page, 'あ');
+
+    // 作った順ではなく名前順。並びは手で並べたときだけ変わる。
+    expect(await groupNames(page)).toEqual(['あ', 'い', '未分類']);
+
+    await dragGroup(page, 'い', 'あ');
+    expect(await groupNames(page)).toEqual(['い', 'あ', '未分類']);
+
+    // 未分類の上へ落としても、その手前——並びの末尾に入るだけ。
+    await dragGroup(page, 'い', '未分類');
+    expect(await groupNames(page)).toEqual(['あ', 'い', '未分類']);
+
+    // 並びは残る。
+    await page.reload({ waitUntil: 'networkidle' });
+    await expect(page.locator('#mode input[value="edit"]')).toBeEnabled({ timeout: 60_000 });
+    await page.waitForTimeout(1500);
+    expect(await groupNames(page)).toEqual(['あ', 'い', '未分類']);
+  });
+
+  test('並びは書き出しに載り、取り込みでは手元が先', async ({ page }) => {
+    const work = mkdtempSync(join(tmpdir(), 'tanbo-'));
+    await drawPolygon(page, SQUARE);
+    await moveToGroup(page, 'あ');
+    await addGroup(page, 'い');
+    await dragGroup(page, 'い', 'あ');
+    expect(await groupNames(page)).toEqual(['い', 'あ']);
+
+    const file = join(work, 'tanbo.geojson');
+    await exportGeoJSON(page, file);
+    const exported = JSON.parse(readFileSync(file, 'utf8'));
+    expect(exported.groupOrder).toEqual(['い', 'あ']);
+
+    // 手元にない「ぬ」を持つファイルを作って読ませる。
+    const incoming = join(work, 'incoming.geojson');
+    exported.groupOrder = ['ぬ', 'あ'];
+    exported.features[0].properties.group = 'ぬ';
+    writeFileSync(incoming, JSON.stringify(exported));
+    await page.setInputFiles('#import-file', incoming);
+    await page.waitForTimeout(600);
+
+    // 手元の並びはそのまま。ファイルで初めて出た「ぬ」だけ末尾に付く。
+    expect(await groupNames(page)).toEqual(['い', 'あ', 'ぬ']);
   });
 
   test('名前順に並べる。数字は数として比べる', async ({ page }) => {

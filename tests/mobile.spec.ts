@@ -224,9 +224,10 @@ test.describe('電話で使う', () => {
 
     await page.locator('#list-open').tap();
     await page.waitForTimeout(400);
+    // 設定への入り口は地図の歯車だけ。シートの見出しには置いていない。
+    await expect(page.locator('#settings-open')).toBeHidden();
     for (const selector of [
       '#list-close',
-      '#settings-open',
       '#item-search',
       '#kind-filters label',
       '#group-add',

@@ -37,6 +37,11 @@ export interface Settings {
    * 田んぼのファイル（書き出す GeoJSON）には混ぜない——あちらは地図に置いたものだけ。
    */
   groups: string[];
+  /**
+   * 手で並べたグループの並び。作っただけでは載らない（載せると、作った順が
+   * 名前順を追い出してしまう）。ここに無い名前は名前順で後ろに続く。
+   */
+  groupOrder: string[];
 }
 
 const DEFAULT_OPACITY: Record<OverlayId, number> = {
@@ -63,6 +68,7 @@ function build(
     collapsedFolders?: unknown;
     groups?: unknown;
     folders?: unknown;
+    groupOrder?: unknown;
   }
 ): Settings {
   const overlays = {} as Record<OverlayId, OverlaySetting>;
@@ -74,6 +80,7 @@ function build(
     // 「フォルダ」と呼んでいた頃の設定も拾う。作った名前を消さないため。
     collapsedGroups: readNames(stored.collapsedGroups ?? stored.collapsedFolders),
     groups: readNames(stored.groups ?? stored.folders),
+    groupOrder: readNames(stored.groupOrder),
   };
 }
 
