@@ -65,7 +65,18 @@ export class PinLayer {
         element.replaceChildren(iconSvg(icon, 22));
       }
 
-      marker.setDraggable(pin.id === this.#draggingId);
+      /*
+       * 掴んでいるピンが作り直されたら、掴む仕掛けも付け直す。グループごと隠して
+       * 出し直すと Marker ごと消えるので、掴める見た目だけ戻って動かせなくなる。
+       */
+      const dragging = pin.id === this.#draggingId;
+      marker.setDraggable(dragging);
+      if (dragging) {
+        marker.off('drag', this.#handleDrag);
+        marker.off('dragend', this.#handleDrag);
+        marker.on('drag', this.#handleDrag);
+        marker.on('dragend', this.#handleDrag);
+      }
     }
   }
 

@@ -103,6 +103,15 @@ export function groupOf(item: Item): string {
   return group === undefined || group === '' ? NO_GROUP : group;
 }
 
+/**
+ * 地図に出すかどうか。1 つずつの `visible` と、グループごとのまとめた表示の AND。
+ * グループ側は行の状態を書き換えない——書き換えると、また出したときに
+ * 1 つずつ隠していたものまで出てきてしまう。
+ */
+export function isItemShown(item: Item, hiddenGroups: string[]): boolean {
+  return item.visible && !hiddenGroups.includes(groupOf(item));
+}
+
 /** いま使われているグループ名。付け替えの候補に出す。 */
 export function groupNames(items: Item[]): string[] {
   const names = new Set(items.map((item) => groupOf(item)));

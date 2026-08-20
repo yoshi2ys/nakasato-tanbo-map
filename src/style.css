@@ -240,6 +240,7 @@ button {
   box-shadow: inset 0 -2px 0 #0071e3;
 }
 
+.group-visible,
 .group-remove {
   display: flex;
   flex: none;
@@ -255,6 +256,21 @@ button {
 
 .group-remove:hover {
   color: #c8102e;
+}
+
+.group-visible[aria-pressed='false'] {
+  color: #c7c7cc;
+}
+
+/* 隠しているグループの目こそ押して戻す先なので、後ろに置いてホバーを効かせる。 */
+.group-visible:hover {
+  color: #1d1d1f;
+}
+
+/* まとめて隠しているあいだは中身も薄くする。行ごとの出し入れはそのまま残っている。 */
+.group.hidden-group .group-name,
+.group.hidden-group .group-items {
+  opacity: 0.5;
 }
 
 /* 掴んでいる行は薄くする。どれを動かしているのかを見失わない。 */

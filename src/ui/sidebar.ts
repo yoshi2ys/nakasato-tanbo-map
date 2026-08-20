@@ -28,6 +28,8 @@ export interface SidebarCallbacks {
   onToggleVisible: (id: string) => void;
   onDelete: (id: string) => void;
   onToggleGroup: (group: string) => void;
+  /** グループごとまとめて地図から隠す・出す。 */
+  onToggleGroupHidden: (group: string) => void;
   /** 行をグループへ移す。未分類へ戻すときは空文字を渡す。 */
   onMoveToGroup: (id: string, group: string) => void;
   onRemoveGroup: (group: string) => void;
@@ -68,6 +70,8 @@ export class Sidebar {
   #selectedId: string | null = null;
   #editingId: string | null = null;
   #collapsed: string[] = [];
+  /** まとめて隠してあるグループ。行の visible とは別に持つ。 */
+  #hidden: string[] = [];
   /** 中身が空でも出すグループ。設定に持っている「作ったグループ」。 */
   #groups: string[] = [];
   /** 手で並べたグループの並び。ここに無い名前は名前順で後ろに続く。 */
@@ -87,6 +91,7 @@ export class Sidebar {
     selectedId: string | null,
     editingId: string | null,
     collapsed: string[],
+    hidden: string[],
     groups: string[],
     groupOrder: string[]
   ): void {
@@ -94,6 +99,7 @@ export class Sidebar {
     this.#selectedId = selectedId;
     this.#editingId = editingId;
     this.#collapsed = collapsed;
+    this.#hidden = hidden;
     this.#groups = groups;
     this.#groupOrder = groupOrder;
     this.#paint();
@@ -131,8 +137,12 @@ export class Sidebar {
     // 作っただけでまだ空のグループも見出しを出す。入れる先が見えないと移しようがない。
     for (const name of this.#groups) if (!groups.has(name)) groups.set(name, []);
     const names = orderGroups([...groups.keys()], this.#groupOrder);
-    // グループを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても読む先が増えるだけ。
-    const flat = names.length === 1 && names[0] === NO_GROUP;
+    /*
+     * グループを使っていないうちは見出しを出さない。1 つしかない括りに名前を付けても
+     * 読む先が増えるだけ。ただし未分類を隠しているあいだは出す——見出しごと消すと、
+     * 地図から消えたものを戻す押しボタンまで無くなる。
+     */
+    const flat = names.length === 1 && names[0] === NO_GROUP && !this.#hidden.includes(NO_GROUP);
     this.#list.replaceChildren(
       ...(flat
         ? [...shown]
@@ -221,6 +231,25 @@ export class Sidebar {
 
     head.append(mark, name, count);
     block.append(head);
+
+    /*
+     * まとめて隠す。行の `visible` は触らない——触ると、また出したときに
+     * 1 つずつ隠していたものまで出てくる。ここは設定側のグループの状態だけを切る。
+     */
+    const hidden = this.#hidden.includes(group);
+    const visible = document.createElement('button');
+    visible.type = 'button';
+    visible.className = 'group-visible';
+    visible.setAttribute('aria-pressed', String(!hidden));
+    visible.append(iconSvg(hidden ? 'visibility_off' : 'visibility', 14));
+    visible.title = hidden ? `${group} をまとめて出す` : `${group} をまとめて隠す`;
+    visible.addEventListener('click', (event) => {
+      // 見出しを押すと畳むので、こちらの押下は届かせない。
+      event.stopPropagation();
+      this.#callbacks.onToggleGroupHidden(group);
+    });
+    head.append(visible);
+    block.classList.toggle('hidden-group', hidden);
 
     // 空になったグループだけ捨てられる。中身ごと消える削除は、押し間違いが痛い。
     if (items.length === 0 && group !== NO_GROUP) {

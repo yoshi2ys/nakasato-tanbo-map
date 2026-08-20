@@ -14,6 +14,8 @@ import {
   ImportError,
   defaultColor,
   groupNames,
+  groupOf,
+  isItemShown,
   orderGroups,
   NO_GROUP,
   fromGeoJSON,
@@ -183,9 +185,13 @@ export function startApp(): void {
     const sidebar = new Sidebar({
       onSelect: (id) => selectItem(id),
       onToggleVisible: (id) => toggleVisible(id),
+      onToggleGroupHidden: (group) => {
+        setGroupFlag('hiddenGroups', group, !settings.hiddenGroups.includes(group));
+        render();
+      },
       onDelete: (id) => removeItem(id),
       onMoveToGroup: (id, group) => {
-        updateItem(id, (item) => ({ ...item, group: group === '' ? undefined : group }));
+        moveToGroup(id, group);
       },
       onReorder: (group, orderedIds) => {
         // 並べ直したグループだけに番号を振る。触っていないグループは名前順のまま。
@@ -211,29 +217,21 @@ export function startApp(): void {
           ...settings,
           groups: settings.groups.filter((name) => name !== group),
           collapsedGroups: settings.collapsedGroups.filter((name) => name !== group),
+          hiddenGroups: settings.hiddenGroups.filter((name) => name !== group),
         };
         storeSettings(settings);
         listDirty = true;
         render();
       },
       onToggleGroup: (group) => {
-        const collapsed = settings.collapsedGroups;
-        settings = {
-          ...settings,
-          collapsedGroups: collapsed.includes(group)
-            ? collapsed.filter((name) => name !== group)
-            : [...collapsed, group],
-        };
-        storeSettings(settings);
-        listDirty = true;
+        setGroupFlag('collapsedGroups', group, !settings.collapsedGroups.includes(group));
         render();
       },
     });
     const detail = new DetailSheet({
       onRename: (id, name) => updateItem(id, (item) => ({ ...item, name })),
       onGroup: (id, group) => {
-        const trimmed = group.trim();
-        updateItem(id, (item) => ({ ...item, group: trimmed === '' ? undefined : trimmed }));
+        moveToGroup(id, group.trim());
       },
       onRecolor: (id, color) => {
         updateItem(id, (item) => ({ ...item, color }));
@@ -264,13 +262,13 @@ export function startApp(): void {
       onExport: (rect, format) => void saveImage(rect, format),
     });
     new SettingsSheet(settings, {
-      onOverlayChange: (next) => {
-        settings = next;
+      onOverlayChange: (id, setting) => {
+        settings = { ...settings, overlays: { ...settings.overlays, [id]: { ...setting } } };
         applyOverlaySettings(map, settings);
         storeSettings(settings);
       },
-      onTextScaleChange: (next) => {
-        settings = next;
+      onTextScaleChange: (key, scale) => {
+        settings = { ...settings, [key]: scale };
         applyTextScales(settings);
         storeSettings(settings);
       },
@@ -337,6 +335,8 @@ export function startApp(): void {
         listDirty = true;
         // 絞り込んだままだと、いま描いたものが一覧に出ない。
         sidebar.resetFilter();
+        // 隠したままのグループに入ると、描いたのに地図から消える。入る先は出しておく。
+        setGroupFlag('hiddenGroups', groupOf(item), false);
         editor.setColor(item.color);
       } else {
         items = items.map((item) => (item.id === editingId ? { ...item, vertices } : item));
@@ -411,6 +411,37 @@ export function startApp(): void {
       map.fitBounds(bounds, { padding: 80, duration: 400 });
     }
 
+    /**
+     * グループごとの印（畳んである・まとめて隠してある）を付け外しする。
+     * どちらも名前の配列なので、書き込みと保存はここ 1 か所にまとめる。
+     */
+    function setGroupFlag(
+      key: 'collapsedGroups' | 'hiddenGroups',
+      group: string,
+      on: boolean
+    ): void {
+      const names = settings[key];
+      if (names.includes(group) === on) return;
+      settings = {
+        ...settings,
+        [key]: on ? [...names, group] : names.filter((name) => name !== group),
+      };
+      storeSettings(settings);
+      listDirty = true;
+    }
+
+    /** 地図に出すもの。行ごとの出し入れとグループごとの出し入れの AND。画像もこれを写す。 */
+    /** 行を別のグループへ移す。空文字なら未分類へ戻す。 */
+    function moveToGroup(id: string, group: string): void {
+      // 移した先を隠したままだと、動かした行が地図から消える。新規や取り込みと揃える。
+      setGroupFlag('hiddenGroups', group === '' ? NO_GROUP : group, false);
+      updateItem(id, (item) => ({ ...item, group: group === '' ? undefined : group }));
+    }
+
+    function shownItems(): Item[] {
+      return items.filter((item) => isItemShown(item, settings.hiddenGroups));
+    }
+
     function toggleVisible(id: string): void {
       updateItem(id, (item) => ({ ...item, visible: !item.visible }));
     }
@@ -436,6 +467,8 @@ export function startApp(): void {
     function commitEditing(): void {
       if (editingId === null && edit.vertexCount === 0) return;
       editingId = null;
+      // 一覧は編集中の行だけ出し入れを止めている。手放したなら、そこも描き直す。
+      listDirty = true;
       pinLayer.clearDraggable();
       restartEditor();
       edit = EMPTY_EDIT;
@@ -528,9 +561,10 @@ export function startApp(): void {
       clearItemsButton.disabled = busy || items.length === 0;
       importButton.disabled = busy;
 
-      itemLayer.setItems(items, selectedId, editingId);
+      const shown = shownItems();
+      itemLayer.setItems(shown, selectedId, editingId);
       pinLayer.setPins(
-        items.filter((item) => item.kind === 'pin' && item.visible),
+        shown.filter((item) => item.kind === 'pin'),
         selectedId
       );
 
@@ -541,7 +575,7 @@ export function startApp(): void {
        */
       if (mode === 'view') {
         labels.setLines(
-          items.filter((item) => item.kind === 'measure' && item.visible).map((item) => item.vertices)
+          shown.filter((item) => item.kind === 'measure').map((item) => item.vertices)
         );
       } else {
         // 引いている最中も長さは見たい。確定を待たせると、行き過ぎてから測り直すことになる。
@@ -558,6 +592,7 @@ export function startApp(): void {
           selectedId,
           editingId,
           settings.collapsedGroups,
+          settings.hiddenGroups,
           settings.groups,
           settings.groupOrder
         );
@@ -775,7 +810,13 @@ export function startApp(): void {
       selectedId = null;
       editingId = null;
       commitEditing();
-      settings = { ...settings, groups: [], collapsedGroups: [], groupOrder: [] };
+      settings = {
+        ...settings,
+        groups: [],
+        collapsedGroups: [],
+        hiddenGroups: [],
+        groupOrder: [],
+      };
       storeSettings(settings);
       notice = null;
       persist();
@@ -808,6 +849,8 @@ export function startApp(): void {
         storeSettings(settings);
         // 取り込んだものは別のものとして足す。既存を消したいときは一覧から削除する。
         items = merge(items, imported.items);
+        // 取り込んだ先を隠したままだと、読めたのに地図に出ない。入った先は出しておく。
+        for (const item of imported.items) setGroupFlag('hiddenGroups', groupOf(item), false);
         commitEditing();
         // 読み込んだものが絞り込みで見えないと、取り込めたのかどうかが分からない。
         sidebar.resetFilter();
@@ -932,7 +975,7 @@ export function startApp(): void {
     async function saveImage(rect: CropRect, format: ImageFormat): Promise<void> {
       crop.setBusy(true);
       try {
-        const blob = await captureImage(map, items, rect, format);
+        const blob = await captureImage(map, shownItems(), rect, format);
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;

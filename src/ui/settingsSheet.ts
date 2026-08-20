@@ -1,10 +1,14 @@
-import { OVERLAYS } from '../overlays';
-import { TEXT_SCALES, type Settings, type TextScale } from '../settings';
+import { OVERLAYS, type OverlayId } from '../overlays';
+import { TEXT_SCALES, type OverlaySetting, type Settings, type TextScale } from '../settings';
 import { element, setIcon } from './dom';
 
+/*
+ * 変わったところだけ知らせる。設定はアプリ側が持っていて、グループの表示などで
+ * 別の写しに差し替わる。丸ごと返すと、シートが握っている古い写しで上書きしてしまう。
+ */
 export interface SettingsCallbacks {
-  onOverlayChange: (settings: Settings) => void;
-  onTextScaleChange: (settings: Settings) => void;
+  onOverlayChange: (id: OverlayId, setting: OverlaySetting) => void;
+  onTextScaleChange: (key: 'uiScale' | 'labelScale', scale: TextScale) => void;
 }
 
 const SCALE_LABEL: Record<TextScale, string> = { small: '小', medium: '中', large: '大' };
@@ -83,7 +87,7 @@ export class SettingsSheet {
           input.addEventListener('change', () => {
             if (!input.checked) return;
             this.#settings[row.key] = scale;
-            this.#callbacks.onTextScaleChange(this.#settings);
+            this.#callbacks.onTextScaleChange(row.key, scale);
           });
           const text = document.createElement('span');
           text.textContent = SCALE_LABEL[scale];
@@ -127,11 +131,11 @@ export class SettingsSheet {
         toggle.addEventListener('change', () => {
           setting.on = toggle.checked;
           opacity.disabled = !toggle.checked;
-          this.#callbacks.onOverlayChange(this.#settings);
+          this.#callbacks.onOverlayChange(overlay.id, setting);
         });
         opacity.addEventListener('input', () => {
           setting.opacity = Number(opacity.value);
-          this.#callbacks.onOverlayChange(this.#settings);
+          this.#callbacks.onOverlayChange(overlay.id, setting);
         });
 
         row.append(toggleLabel, opacity);

@@ -8,10 +8,13 @@ import {
   drawPolygon,
   exportGeoJSON,
   itemRows,
+  mapPixels,
   openApp,
   setMode,
   startEditing,
   startNew,
+  toggleRowVisible,
+  waitForApp,
 } from './helpers';
 
 const SQUARE: [number, number][] = [
@@ -58,6 +61,13 @@ async function moveToGroup(page: import('@playwright/test').Page, name: string):
   await page.locator('#detail-group').press('Enter');
   await page.waitForTimeout(300);
 }
+
+const THIRD: [number, number][] = [
+  [600, 560],
+  [740, 560],
+  [740, 660],
+  [600, 660],
+];
 
 test.describe('一覧をグループでまとめる', () => {
   let errors: string[];
@@ -113,6 +123,68 @@ test.describe('一覧をグループでまとめる', () => {
     await page.waitForTimeout(1500);
     expect(await itemRows(page)).toHaveLength(0);
     await expect(page.locator('.group-head').first()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('グループごとまとめて隠せる。1 つずつの出し入れは残る', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await moveToGroup(page, '大屋敷');
+    await startNew(page);
+    await drawPolygon(page, OTHER);
+    await moveToGroup(page, '大屋敷');
+    await setMode(page, 'view');
+    const drawn = await mapPixels(page, 'drawn');
+
+    // 先に 1 つだけ隠しておく。まとめて出したときに、これが戻ってこないのが正しい。
+    await toggleRowVisible(page, 0);
+    const one = await mapPixels(page, 'drawn');
+    expect(one).toBeLessThan(drawn - 300);
+
+    await page.locator('.group-visible').first().click();
+    await page.waitForTimeout(300);
+    expect(await mapPixels(page, 'drawn')).toBeLessThan(one - 300);
+    // 行の状態は触らない。畳みへも届かない（見出しの中に置いた押しボタンなので）。
+    expect((await itemRows(page)).map((row) => row.visible)).toEqual([false, true]);
+    await expect(page.locator('.group-head').first()).toHaveAttribute('aria-expanded', 'true');
+
+    await page.locator('.group-visible').first().click();
+    await page.waitForTimeout(300);
+    const back = await mapPixels(page, 'drawn');
+    expect(back).toBeGreaterThan(one - 300);
+    // 1 つずつ隠していたぶんは戻らない。まとめて出したのはグループの側だけ。
+    expect(back).toBeLessThan(drawn - 300);
+  });
+
+  test('隠したグループに描いたら、そのグループは出し直す', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await moveToGroup(page, '大屋敷');
+    await startNew(page);
+    await drawPolygon(page, OTHER);
+    await setMode(page, 'view');
+
+    // 未分類をまとめて隠す。見出しは名前順で「大屋敷」の次に来る。
+    await page.locator('.group-visible').nth(1).click();
+    await page.waitForTimeout(300);
+    await expect(page.locator('.group-visible').nth(1)).toHaveAttribute('aria-pressed', 'false');
+
+    // ここで描いたものは未分類に入る。隠れたままだと、描いたのに地図から消える。
+    await setMode(page, 'edit');
+    await drawPolygon(page, THIRD);
+    await setMode(page, 'view');
+    await expect(page.locator('.group-visible').nth(1)).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('まとめて隠した状態は、再読み込みしても残る', async ({ page }) => {
+    await drawPolygon(page, SQUARE);
+    await moveToGroup(page, '大屋敷');
+    await setMode(page, 'view');
+    const drawn = await mapPixels(page, 'drawn');
+    await page.locator('.group-visible').first().click();
+    await page.waitForTimeout(300);
+
+    await page.reload({ waitUntil: 'networkidle' });
+    await waitForApp(page, 1500);
+    await expect(page.locator('.group-visible').first()).toHaveAttribute('aria-pressed', 'false');
+    expect(await mapPixels(page, 'drawn')).toBeLessThan(drawn - 300);
   });
 
   test('グループは書き出しと読み込みで往復する', async ({ page }) => {

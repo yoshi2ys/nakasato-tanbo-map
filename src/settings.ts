@@ -33,6 +33,12 @@ export interface Settings {
   /** 畳んである一覧のグループ名。畳んだままにしておけるよう、設定として残す。 */
   collapsedGroups: string[];
   /**
+   * まとめて隠してあるグループ名。1 つずつの `visible` とは別に持つので、
+   * また出したときに元の出し入れがそのまま戻る。畳んだ状態と同じ「今の見え方」なので、
+   * 書き出す GeoJSON には混ぜない。
+   */
+  hiddenGroups: string[];
+  /**
    * 作ったグループの名前。中身が空でも見出しを出すために持つ。
    * 田んぼのファイル（書き出す GeoJSON）には混ぜない——あちらは地図に置いたものだけ。
    */
@@ -58,19 +64,24 @@ function readScale(value: unknown): TextScale {
   return TEXT_SCALES.includes(value as TextScale) ? (value as TextScale) : 'medium';
 }
 
+/**
+ * 読み出した設定の形。何が入っているかは信じられないので、値はすべて unknown で受ける。
+ * 「フォルダ」と呼んでいた頃のキーも並べてある。
+ */
+interface StoredSettings {
+  overlays?: Record<string, unknown>;
+  uiScale?: unknown;
+  labelScale?: unknown;
+  collapsedGroups?: unknown;
+  collapsedFolders?: unknown;
+  hiddenGroups?: unknown;
+  groups?: unknown;
+  folders?: unknown;
+  groupOrder?: unknown;
+}
+
 /** 保存されている値（無ければ既定）から組み立てる。 */
-function build(
-  read: (id: OverlayId) => unknown,
-  stored: {
-    uiScale?: unknown;
-    labelScale?: unknown;
-    collapsedGroups?: unknown;
-    collapsedFolders?: unknown;
-    groups?: unknown;
-    folders?: unknown;
-    groupOrder?: unknown;
-  }
-): Settings {
+function build(read: (id: OverlayId) => unknown, stored: StoredSettings): Settings {
   const overlays = {} as Record<OverlayId, OverlaySetting>;
   for (const id of OVERLAY_IDS) overlays[id] = readOverlay(read(id), id);
   return {
@@ -79,6 +90,7 @@ function build(
     labelScale: readScale(stored.labelScale),
     // 「フォルダ」と呼んでいた頃の設定も拾う。作った名前を消さないため。
     collapsedGroups: readNames(stored.collapsedGroups ?? stored.collapsedFolders),
+    hiddenGroups: readNames(stored.hiddenGroups),
     groups: readNames(stored.groups ?? stored.folders),
     groupOrder: readNames(stored.groupOrder),
   };
@@ -107,15 +119,7 @@ export function loadSettings(): Settings {
   if (text === null) return defaultSettings();
 
   try {
-    const parsed = JSON.parse(text) as {
-      overlays?: Record<string, unknown>;
-      uiScale?: unknown;
-      labelScale?: unknown;
-      collapsedGroups?: unknown;
-      collapsedFolders?: unknown;
-      groups?: unknown;
-      folders?: unknown;
-    };
+    const parsed = JSON.parse(text) as StoredSettings;
     return build((id) => parsed?.overlays?.[id], parsed ?? {});
   } catch {
     // 壊れた設定で起動できなくなるより、既定で始めるほうがまし。
