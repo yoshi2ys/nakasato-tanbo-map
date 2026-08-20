@@ -2,7 +2,7 @@ import { devices, expect, test, type Page } from '@playwright/test';
 import { collectErrors, itemRows, openApp, openSettings } from './helpers';
 
 /**
- * 電話で開いたときの画面。
+ * iPhone で開いたときの画面。
  *
  * 列を並べる幅がないので、一覧も選んだものの情報も下から出るシートになる。
  * 操作はすべて指で、頂点のドラッグも touch のまま届く（maplibre がタップだけ click に直す）。
@@ -45,7 +45,7 @@ const TRIANGLE: [number, number][] = [
   [280, 430],
 ];
 
-test.describe('電話で使う', () => {
+test.describe('iPhone で使う', () => {
   let errors: string[];
 
   test.beforeEach(async ({ page }) => {
