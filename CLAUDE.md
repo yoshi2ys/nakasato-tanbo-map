@@ -37,7 +37,7 @@ npm run test:dist    # build 済み dist を preview で配って同じテスト
 
 ## テストの前提
 
-Playwright だけで、単体テストは置いていない（地図タイルと OpenCV.js を含めて確かめたいため）。`tests/helpers.ts` の `PADDY_SEEDS` は既定表示（十日町）の圃場に当たる**固定座標**なので、`playwright.config.ts` の viewport（1460×800、`deviceScaleFactor: 1`）や `MAP_LEFT = 260`（左の一覧の幅）を変えるとテストの意味が変わる。`projects` に `devices` を入れると viewport が上書きされるので入れない。ワーカーは 1 本（公共のタイルサーバへ並列に投げない）。
+Playwright だけで、単体テストは置いていない（地図タイルと OpenCV.js を含めて確かめたいため）。`tests/helpers.ts` の `PADDY_SEEDS` は `openApp` が `?c=` で固定する開始位置（十日町）の圃場に当たる**固定座標**なので、`TEST_CENTER` を動かすと取り直しになる。`playwright.config.ts` の viewport（1460×800、`deviceScaleFactor: 1`）や `MAP_LEFT = 260`（左の一覧の幅）を変えるとテストの意味が変わる。`projects` に `devices` を入れると viewport が上書きされるので入れない。ワーカーは 1 本（公共のタイルサーバへ並列に投げない）。
 
 ## 書き方の決まり
 

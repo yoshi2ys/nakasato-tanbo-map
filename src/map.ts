@@ -56,7 +56,7 @@ const TOKAMACHI_ATTRIBUTION =
 const TILE_SIZE = 256;
 
 /** 初期表示位置（十日町）。GeoJSON と同じ順（経度, 緯度）で持つ。 */
-const DEFAULT_CENTER: [lng: number, lat: number] = [138.70184, 37.0525];
+const DEFAULT_CENTER: [lng: number, lat: number] = [138.69887, 37.05323];
 const INITIAL_ZOOM = 17;
 
 /** `?c=経度,緯度` で開始位置を変えられる。別の圃場を人に見せるときと、テストの固定に使う。 */

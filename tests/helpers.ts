@@ -3,7 +3,13 @@ import { expect, type Page } from '@playwright/test';
 /** 地図の左端。左の一覧のぶんだけ、ページ座標は右にずれる。 */
 const MAP_LEFT = 260;
 
-/** 既定表示（十日町市）で確実に圃場の中心に落ちるシード。地図の中の位置で持つ。 */
+/**
+ * シードを合わせてある開始位置（十日町市）。既定の中心を動かしてもテストの意味が変わらないよう、
+ * `?c=` で固定する。この値を変えるなら PADDY_SEEDS も取り直す。
+ */
+const TEST_CENTER = '?c=138.70184,37.0525';
+
+/** この開始位置で確実に圃場の中心に落ちるシード。地図の中の位置で持つ。 */
 export const PADDY_SEEDS: [x: number, y: number][] = [
   [505, 200],
   [555, 315],
@@ -23,7 +29,7 @@ export { EDIT_HINT, EDIT_HINT_MIN } from '../src/hints';
 export type Tool = 'manual' | 'auto' | 'measure' | 'pin';
 
 /** 地図のスタイルが揃い、パネルが操作できるようになるまで待つ。 */
-export async function openApp(page: Page, query = ''): Promise<void> {
+export async function openApp(page: Page, query = TEST_CENTER): Promise<void> {
   // baseURL は公開先と同じサブパスまで含むので、相対で開く。
   await page.goto(`.${query}`, { waitUntil: 'networkidle' });
   await waitForApp(page);
