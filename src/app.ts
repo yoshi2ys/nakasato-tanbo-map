@@ -150,7 +150,7 @@ export function startApp(): void {
     const home = settings.home;
     homeStatus.textContent =
       home === null
-        ? '既定（十日町）から始まります。今見えている場所をホームにできます。'
+        ? '既定（中里支所）から始まります。今見えている場所をホームにできます。'
         : `緯度 ${home.lat.toFixed(5)} / 経度 ${home.lng.toFixed(5)}（ズーム ${home.zoom.toFixed(1)}）`;
     homeResetButton.disabled = home === null;
   }

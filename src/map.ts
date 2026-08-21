@@ -56,7 +56,7 @@ const TOKAMACHI_ATTRIBUTION =
 /** どちらの写真タイルも 256px 四方。 */
 const TILE_SIZE = 256;
 
-/** 初期表示位置（十日町）。GeoJSON と同じ順（経度, 緯度）で持つ。 */
+/** 初期表示位置（十日町市役所中里支所のあたり）。GeoJSON と同じ順（経度, 緯度）で持つ。 */
 const DEFAULT_CENTER: [lng: number, lat: number] = [138.69887, 37.05323];
 const INITIAL_ZOOM = 17;
 
@@ -70,7 +70,7 @@ function centerFromQuery(): [lng: number, lat: number] | null {
   return [lng, lat];
 }
 
-/** ホームの位置。決めていなければ既定（十日町）。ボタンで戻る先はここから出す。 */
+/** ホームの位置。決めていなければ既定（中里支所）。ボタンで戻る先はここから出す。 */
 export function homeView(home: HomePoint | null): {
   center: [lng: number, lat: number];
   zoom: number;

@@ -120,7 +120,7 @@ test.describe('ホーム', () => {
     expect(zoom).toBeCloseTo(17, 5);
   });
 
-  test('既定に戻すと、十日町の既定の位置に戻る', async ({ page }) => {
+  test('既定に戻すと、中里支所の既定の位置に戻る', async ({ page }) => {
     await jumpAway(page);
     await openSettings(page);
     await page.locator('#home-set').click();

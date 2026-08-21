@@ -49,7 +49,7 @@ export function isCenter(lng: number, lat: number): boolean {
 
 export interface Settings {
   overlays: Record<OverlayId, OverlaySetting>;
-  /** 決めていなければ null。そのときは地図側の既定（十日町）に落ちる。 */
+  /** 決めていなければ null。そのときは地図側の既定（中里支所）に落ちる。 */
   home: HomePoint | null;
   /** 画面まわりの文字。 */
   uiScale: TextScale;
