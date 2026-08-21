@@ -28,7 +28,7 @@ import {
   type Item,
   type ItemKind,
 } from './items';
-import { createMap, setRotationEnabled, tileSources } from './map';
+import { addHomeControl, createMap, homeView, setRotationEnabled, tileSources } from './map';
 import { MeasureLabels } from './measureLabels';
 import { applyOverlaySettings, OVERLAY_LAYER_IDS } from './overlays';
 import { PinLayer } from './pins';
@@ -112,6 +112,9 @@ export function startApp(): void {
   const panelFields = element('panel-fields');
   const imageOpenButton = element<HTMLButtonElement>('image-open');
   const groupAddButton = element<HTMLButtonElement>('group-add');
+  const homeStatus = element('home-status');
+  const homeSetButton = element<HTMLButtonElement>('home-set');
+  const homeResetButton = element<HTMLButtonElement>('home-reset');
   /** 幅の境目は CSS と同じ。ここを跨いだら、名前や色の欄の置き場所も変える。 */
   const narrowScreen = window.matchMedia('(max-width: 820px)');
   const app = element('app');
@@ -131,7 +134,48 @@ export function startApp(): void {
   }
 
   applyTextScales(settings);
-  const map: MapLibreMap = createMap(element('map'));
+  const map: MapLibreMap = createMap(element('map'), settings.home);
+
+  /** ホームを決め直す。地図は動かさない（今見えている場所を覚えるだけ）。 */
+  function setHome(home: Settings['home']): void {
+    settings = { ...settings, home };
+    const stored = storeSettings(settings);
+    showHome();
+    // 覚えられなかったのに覚えた顔をすると、開き直したときに黙って既定へ戻る。
+    if (!stored) homeStatus.textContent = 'このブラウザには覚えられませんでした';
+  }
+
+  /** 設定シートのホームの欄を、今の設定に合わせる。 */
+  function showHome(): void {
+    const home = settings.home;
+    homeStatus.textContent =
+      home === null
+        ? '既定（十日町）から始まります。今見えている場所をホームにできます。'
+        : `緯度 ${home.lat.toFixed(5)} / 経度 ${home.lng.toFixed(5)}（ズーム ${home.zoom.toFixed(1)}）`;
+    homeResetButton.disabled = home === null;
+  }
+
+  /*
+   * ホームへ戻す。向きも北へ戻す（回したまま戻ると、覚えた画と違って見える）。
+   * 編集中も押せる。描いている途中に見失っても、押せば手がかりのある場所へ戻れる。
+   */
+  function goHome(): void {
+    const view = homeView(settings.home);
+    map.easeTo({ center: view.center, zoom: view.zoom, bearing: 0, duration: 600 });
+  }
+
+  showHome();
+  addHomeControl(map, goHome);
+  homeSetButton.addEventListener('click', () => {
+    /*
+     * 経度は 1 周ぶん足した値で返ってくることがある（東へ回し続けたとき）ので畳む。
+     * 緯度は地図の端が 85.05 まであり、そのままだと読み込みの検査（±85）で捨てられる。
+     * 押したのに覚えていない、を作らないよう、覚える前に通る値に直す。
+     */
+    const { lng, lat } = map.getCenter().wrap();
+    setHome({ lng, lat: Math.max(-85, Math.min(85, lat)), zoom: map.getZoom() });
+  });
+  homeResetButton.addEventListener('click', () => setHome(null));
   // ブラウザから回す確認用の窓口。地図の状態（レイヤーの可視や濃さ）は DOM に出ないので、
   // ここから読めるようにしておく。読むだけで、アプリはこれを使わない。
   (window as unknown as { __tanboMap: MapLibreMap }).__tanboMap = map;

@@ -392,13 +392,14 @@ li.selected .item-name {
   color: #86868b;
 }
 
-#library-actions {
+/* シートの中で横に並ぶボタンの列。新しい節を足すときは、この class を付ける。 */
+.sheet-actions {
   display: flex;
   gap: 6px;
   margin-top: 10px;
 }
 
-#library-actions button {
+.sheet-actions button {
   flex: 1;
   min-width: 0;
   padding: 6px 8px;
@@ -409,7 +410,7 @@ li.selected .item-name {
   cursor: pointer;
 }
 
-#library-actions button:disabled {
+.sheet-actions button:disabled {
   color: #b0b0b5;
   cursor: default;
 }
@@ -875,6 +876,14 @@ li.selected .item-name {
 #crop-actions button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+
+/* ホームのボタン。記号は SVG で足すので、既定の背景画像ではなく中身を中央に置く。 */
+.home-ctrl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
 }
 
 /* 回せないあいだ（編集中）はコンパスを出さない。出ているとつまんで回せてしまう。 */
@@ -1369,7 +1378,7 @@ li.selected .item-name {
   #image-open,
   #panel-actions button,
   #kind-filters label,
-  #library-actions button,
+  .sheet-actions button,
   #offline-actions button,
   .icon-choice {
     display: flex;
@@ -1433,7 +1442,7 @@ li.selected .item-name {
 
   #detail-delete,
   #clear-items,
-  #library-actions button {
+  .sheet-actions button {
     min-height: 44px;
     font-size: calc(14px * var(--ui-scale));
   }

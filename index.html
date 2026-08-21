@@ -187,8 +187,17 @@
         </section>
 
         <section>
+          <h3>ホーム</h3>
+          <p id="home-status" class="note"></p>
+          <div id="home-actions" class="sheet-actions">
+            <button id="home-set" type="button">今の位置にする</button>
+            <button id="home-reset" type="button" disabled>既定に戻す</button>
+          </div>
+        </section>
+
+        <section>
           <h3>データ</h3>
-          <div id="library-actions">
+          <div id="library-actions" class="sheet-actions">
             <button id="export" type="button" disabled>書き出す</button>
             <button id="import" type="button" disabled>読み込む</button>
             <input id="import-file" type="file" accept=".geojson,.json,application/geo+json,application/json" hidden />

@@ -25,7 +25,7 @@ npm run test:dist    # build 済み dist を preview で配って同じテスト
 `src/main.ts` → `src/app.ts` の `startApp()` が入口。app.ts が状態（items、選択、モード、道具、設定）を全部持ち、各モジュールに配る配線役。**モジュール側は app を読まない**。参照は常に app → 部品の一方向で、部品どうしの共有は `geometry.ts` / `units.ts` / `hints.ts` のような純関数に寄せてある。
 
 - モデル: `items.ts` — 田んぼ・計測・ピンを `Item` 1 つの型でまとめる。保存も書き出しも GeoJSON（`localStorage` の `tanbo-map.paddies`、書き込みは 400ms のデバウンス）。設定は別キー `tanbo-map.settings`（`settings.ts`）。グループは `Item.group`（1 段だけ、未設定は「未分類」）。一覧の並びは名前順（`Intl.Collator('ja', { numeric: true })`）で、手で並べ替えたグループだけ `Item.order` を持つ。グループ自体の並び・空のグループ名・畳んだ状態は設定側（`settings.ts` の `groupOrder` / `groups` / `collapsedGroups`）。`groupOrder` は手で並べたときだけ書く（作った順を混ぜると名前順が消える）。書き出す GeoJSON には並びを `groupOrder`（FeatureCollection 直下）で同梱し、読むのは取り込みのときだけ——手元の並びが先で、ファイルで初めて出た名前を末尾に足す。並び順を決める関数は `orderGroups` 1 つで、一覧も書き出しもここを通す。
-- 地図: `map.ts` — MapLibre のスタイル生成。写真タイルは地理院オルソ（全国、z18）＋ 十日町市の航空写真（市域のみ、z20、TMS、`bounds` 必須）の 2 枚重ね。`?c=経度,緯度` で開始位置を変えられる（テストの固定にも使う）。
+- 地図: `map.ts` — MapLibre のスタイル生成。写真タイルは地理院オルソ（全国、z18）＋ 十日町市の航空写真（市域のみ、z20、TMS、`bounds` 必須）の 2 枚重ね。`?c=経度,緯度` で開始位置を変えられる（テストの固定にも使う）。開いたときの位置とホームのボタンで戻る先は `settings.home`（決めていなければ既定の十日町）で、`homeView()` 1 か所から出す。`?c=` は一時の指定なのでホームより先に効く。ホームは端末ごとの覚え書きなので、書き出す GeoJSON には入れない。
 - 描画レイヤー: 保存済みは `itemLayer.ts`（面・線）と `pins.ts`（HTML Marker）、編集中は `editor.ts`、検出の下見は `preview.ts`、計測のラベルは `measureLabels.ts`。重ね順は `editor.ts` の `EDIT_FILL_LAYER_ID` を基準に組む。
 - 編集: `editor.ts` — polygon / line / point を 1 つのクラスで扱う自前実装（mapbox-gl-draw は使わない）。頂点ドラッグ、中点ゴーストでの追加、スナップ閉合、自己交差の判定。
 - 自動検出: `detect.ts` — 表示中の canvas を読んで OpenCV.js でフラッドフィル → モルフォロジー → `findContours` → `approxPolyDP`。閾値はピクセルではなく**地上距離（m）**で持つ（ズームや画像ソースで 1px の意味が変わるため）。OpenCV.js は 13MB あるので初回の検出まで読み込まない。

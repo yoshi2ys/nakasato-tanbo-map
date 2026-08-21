@@ -7,8 +7,9 @@ import {
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
+import { iconSvg } from './icons';
 import { addOverlayLayers, overlayTileSources } from './overlays';
-import type { Settings } from './settings';
+import { isCenter, MAX_ZOOM, type HomePoint, type Settings } from './settings';
 import { cachedTileUrl, installTileCache, type TileSource } from './tileCache';
 
 // maplibre-gl は worker を「自分自身の import.meta.url の兄弟ファイル」として実行時に
@@ -60,19 +61,22 @@ const DEFAULT_CENTER: [lng: number, lat: number] = [138.69887, 37.05323];
 const INITIAL_ZOOM = 17;
 
 /** `?c=経度,緯度` で開始位置を変えられる。別の圃場を人に見せるときと、テストの固定に使う。 */
-function initialCenter(): [lng: number, lat: number] {
+function centerFromQuery(): [lng: number, lat: number] | null {
   const value = new URLSearchParams(location.search).get('c');
-  if (value === null) return DEFAULT_CENTER;
+  if (value === null) return null;
 
   const [lng, lat] = value.split(',').map(Number);
-  const usable =
-    lng !== undefined &&
-    lat !== undefined &&
-    Number.isFinite(lng) &&
-    Number.isFinite(lat) &&
-    Math.abs(lng) <= 180 &&
-    Math.abs(lat) <= 85;
-  return usable ? [lng, lat] : DEFAULT_CENTER;
+  if (lng === undefined || lat === undefined || !isCenter(lng, lat)) return null;
+  return [lng, lat];
+}
+
+/** ホームの位置。決めていなければ既定（十日町）。ボタンで戻る先はここから出す。 */
+export function homeView(home: HomePoint | null): {
+  center: [lng: number, lat: number];
+  zoom: number;
+} {
+  if (home === null) return { center: DEFAULT_CENTER, zoom: INITIAL_ZOOM };
+  return { center: [home.lng, home.lat], zoom: home.zoom };
 }
 
 /** 写真タイルの出どころ。オフライン用にためるときも、この定義から URL を数える。 */
@@ -95,13 +99,23 @@ export function tileSources(settings: Settings): TileSource[] {
   return [...PHOTO_SOURCES, ...overlayTileSources(settings)];
 }
 
-export function createMap(container: HTMLElement): MapLibreMap {
+/**
+ * 開いたときに出す位置。`?c=` は人に見せるときとテストのための一時の指定なので、
+ * ホームより先に効かせる。そのときのズームは既定に戻す——覚えたホームのズームを混ぜると、
+ * 同じ URL を渡しても人によって違う画が出る。
+ */
+function initialView(home: HomePoint | null): { center: [lng: number, lat: number]; zoom: number } {
+  const query = centerFromQuery();
+  return query === null ? homeView(home) : { center: query, zoom: INITIAL_ZOOM };
+}
+
+export function createMap(container: HTMLElement, home: HomePoint | null): MapLibreMap {
+  const view = initialView(home);
   const map = new MapLibreMap({
     container,
-    center: initialCenter(),
-    zoom: INITIAL_ZOOM,
-    // 十日町市の写真は z20 まであるので、地図側は 19 まで等倍で見られる。
-    maxZoom: 21,
+    center: view.center,
+    zoom: view.zoom,
+    maxZoom: MAX_ZOOM,
     // 回転は表示モードでだけ許す（setRotationEnabled）。編集中に回ると、頂点を掴む手が
     // そのまま地図を回してしまう。
     dragRotate: false,
@@ -177,6 +191,33 @@ export function createMap(container: HTMLElement): MapLibreMap {
   map.addControl(new AttributionControl({ compact: false }));
 
   return map;
+}
+
+/**
+ * ホームへ戻すボタン。ズームやコンパスと同じ枠に乗せる（下端の並びの一番上に積まれる）。
+ * 自前で浮かせると、狭い画面で出典の帯や一覧のボタンと重なる場所を探すことになる。
+ */
+export function addHomeControl(map: MapLibreMap, onClick: () => void): void {
+  map.addControl(
+    {
+      onAdd: () => {
+        const container = document.createElement('div');
+        container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.id = 'home-go';
+        button.className = 'home-ctrl';
+        button.title = 'ホームに戻る';
+        button.setAttribute('aria-label', 'ホームに戻る');
+        button.append(iconSvg('home', 18));
+        button.addEventListener('click', onClick);
+        container.append(button);
+        return container;
+      },
+      onRemove: () => undefined,
+    },
+    'bottom-left'
+  );
 }
 
 /**

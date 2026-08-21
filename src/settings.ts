@@ -24,8 +24,33 @@ export const TEXT_SCALE_FACTOR: Record<TextScale, number> = {
   large: 1.25,
 };
 
+/**
+ * ホーム。開いたときに出る位置で、ホームのボタンで戻る先。
+ * 端末ごとの覚え書きなので、書き出す GeoJSON には入れない。
+ */
+export interface HomePoint {
+  lng: number;
+  lat: number;
+  zoom: number;
+}
+
+/**
+ * 地図の拡大の上限。十日町市の写真が z20 まであるので、地図側は 19 まで等倍で見られる。
+ * 覚えたホームもこれを超えていたら捨てる（地図が受け付けない画から始めない）。
+ */
+export const MAX_ZOOM = 21;
+
+/** 地図の中心として通せる値か。`?c=` で渡された値もこれで見る。 */
+export function isCenter(lng: number, lat: number): boolean {
+  return (
+    Number.isFinite(lng) && Number.isFinite(lat) && Math.abs(lng) <= 180 && Math.abs(lat) <= 85
+  );
+}
+
 export interface Settings {
   overlays: Record<OverlayId, OverlaySetting>;
+  /** 決めていなければ null。そのときは地図側の既定（十日町）に落ちる。 */
+  home: HomePoint | null;
   /** 画面まわりの文字。 */
   uiScale: TextScale;
   /** 地図に出る文字（計測の長さなど）。 */
@@ -75,6 +100,7 @@ interface StoredSettings {
   collapsedGroups?: unknown;
   collapsedFolders?: unknown;
   hiddenGroups?: unknown;
+  home?: unknown;
   groups?: unknown;
   folders?: unknown;
   groupOrder?: unknown;
@@ -86,6 +112,7 @@ function build(read: (id: OverlayId) => unknown, stored: StoredSettings): Settin
   for (const id of OVERLAY_IDS) overlays[id] = readOverlay(read(id), id);
   return {
     overlays,
+    home: readHome(stored.home),
     uiScale: readScale(stored.uiScale),
     labelScale: readScale(stored.labelScale),
     // 「フォルダ」と呼んでいた頃の設定も拾う。作った名前を消さないため。
@@ -94,6 +121,19 @@ function build(read: (id: OverlayId) => unknown, stored: StoredSettings): Settin
     groups: readNames(stored.groups ?? stored.folders),
     groupOrder: readNames(stored.groupOrder),
   };
+}
+
+/**
+ * 壊れたホームは無かったことにする（既定に落ちる）。
+ * ここを通さないと、開いた瞬間に地図が海の上へ飛ぶ。
+ */
+function readHome(value: unknown): HomePoint | null {
+  const record = value as Partial<HomePoint> | null | undefined;
+  if (record === null || record === undefined) return null;
+  const { lng, lat, zoom } = record;
+  if (typeof lng !== 'number' || typeof lat !== 'number' || typeof zoom !== 'number') return null;
+  if (!isCenter(lng, lat) || !Number.isFinite(zoom) || zoom < 0 || zoom > MAX_ZOOM) return null;
+  return { lng, lat, zoom };
 }
 
 /** 文字列の配列だけを通す。壊れた設定で一覧が出なくなるより、空で始めるほうがまし。 */
