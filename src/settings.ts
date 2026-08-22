@@ -25,6 +25,23 @@ export const TEXT_SCALE_FACTOR: Record<TextScale, number> = {
 };
 
 /**
+ * 一覧の幅の下限と上限（px）。
+ * 下限はタブレット幅での既定と同じ 200px——見出しの題名と歯車がここまでは並ぶ。
+ * 上限は 1460px の窓（テストの viewport と同じ）で地図に 900px 残る幅。名前が長い田んぼを
+ * 折り返さずに読める一方、これ以上広げても一覧に足せるものがない。
+ * 狭い窓ではこの上限に届く前に MIN_MAP_WIDTH が効く。
+ */
+export const MIN_SIDEBAR_WIDTH = 200;
+export const MAX_SIDEBAR_WIDTH = 560;
+
+/**
+ * 一覧をどれだけ広げても地図に残す幅（px）。
+ * 821px（タブレットの横向き）で一覧を上限まで広げると地図が 261px しか残らず、
+ * 田んぼ 1 枚と周りの畦がやっと入る程度になる。写真として使える下限をここに置く。
+ */
+export const MIN_MAP_WIDTH = 420;
+
+/**
  * ホーム。開いたときに出る位置で、ホームのボタンで戻る先。
  * 端末ごとの覚え書きなので、書き出す GeoJSON には入れない。
  */
@@ -51,6 +68,11 @@ export interface Settings {
   overlays: Record<OverlayId, OverlaySetting>;
   /** 決めていなければ null。そのときは地図側の既定（中里支所）に落ちる。 */
   home: HomePoint | null;
+  /**
+   * 手で決めた一覧の幅（px）。触っていなければ null で、そのときは CSS の既定に落ちる
+   * （画面幅で 260px / 200px が切り替わる）。端末ごとの見え方なので書き出しには混ぜない。
+   */
+  sidebarWidth: number | null;
   /** 画面まわりの文字。 */
   uiScale: TextScale;
   /** 地図に出る文字（計測の長さなど）。 */
@@ -95,6 +117,7 @@ function readScale(value: unknown): TextScale {
  */
 interface StoredSettings {
   overlays?: Record<string, unknown>;
+  sidebarWidth?: unknown;
   uiScale?: unknown;
   labelScale?: unknown;
   collapsedGroups?: unknown;
@@ -113,6 +136,7 @@ function build(read: (id: OverlayId) => unknown, stored: StoredSettings): Settin
   return {
     overlays,
     home: readHome(stored.home),
+    sidebarWidth: readSidebarWidth(stored.sidebarWidth),
     uiScale: readScale(stored.uiScale),
     labelScale: readScale(stored.labelScale),
     // 「フォルダ」と呼んでいた頃の設定も拾う。作った名前を消さないため。
@@ -134,6 +158,15 @@ function readHome(value: unknown): HomePoint | null {
   if (typeof lng !== 'number' || typeof lat !== 'number' || typeof zoom !== 'number') return null;
   if (!isCenter(lng, lat) || !Number.isFinite(zoom) || zoom < 0 || zoom > MAX_ZOOM) return null;
   return { lng, lat, zoom };
+}
+
+/**
+ * 壊れた値は「決めていない」に倒す（既定の幅で開く）。
+ * 範囲の外は捨てずに挟む——上限を後から下げたとき、覚えた幅を消すより端に寄せるほうがいい。
+ */
+function readSidebarWidth(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, value));
 }
 
 /** 文字列の配列だけを通す。壊れた設定で一覧が出なくなるより、空で始めるほうがまし。 */

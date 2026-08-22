@@ -42,6 +42,7 @@ import { element, isTyping, setIcon } from './ui/dom';
 import { DetailSheet } from './ui/detailSheet';
 import { Panel } from './ui/panel';
 import { Sidebar } from './ui/sidebar';
+import { initSidebarResize } from './ui/sidebarResize';
 import { SettingsSheet } from './ui/settingsSheet';
 
 /**
@@ -134,6 +135,10 @@ export function startApp(): void {
   }
 
   applyTextScales(settings);
+  initSidebarResize(settings.sidebarWidth, (width) => {
+    settings = { ...settings, sidebarWidth: width };
+    storeSettings(settings);
+  });
   const map: MapLibreMap = createMap(element('map'), settings.home);
 
   /** ホームを決め直す。地図は動かさない（今見えている場所を覚えるだけ）。 */

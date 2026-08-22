@@ -35,18 +35,40 @@ button {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 260px) minmax(0, 1fr);
 }
 
 /* MARK: - サイドバー */
 
 #sidebar {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
   padding: 12px;
   border-right: 1px solid #e5e5e7;
   background: #fbfbfd;
+}
+
+/*
+ * 幅を変える掴みしろ。境目そのものは 1px しかないので、
+ * 掴める帯を左右にはみ出させて指とポインタの当たりを広げる。
+ */
+#sidebar-resize {
+  position: absolute;
+  /* 地図（#stage の canvas）は DOM で後ろにあるので、重ねないとはみ出したぶんを取られる。 */
+  z-index: 1;
+  top: 0;
+  right: -3px;
+  bottom: 0;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+#sidebar-resize:hover,
+#sidebar-resize.dragging {
+  background: rgb(0 122 255 / 0.35);
 }
 
 #sidebar-header {
@@ -1171,7 +1193,7 @@ li.selected .item-name {
 /* タブレットくらいの幅。列のままでいけるが、そのままだと地図の取り分が減りすぎる。 */
 @media (max-width: 1100px) and (min-width: 821px) {
   #app {
-    grid-template-columns: 200px minmax(0, 1fr);
+    grid-template-columns: var(--sidebar-width, 200px) minmax(0, 1fr);
   }
 
   #sidebar {
@@ -1196,6 +1218,11 @@ li.selected .item-name {
 @media (max-width: 820px) {
   #app {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 下から出すシートなので幅は画面いっぱい。掴みしろの出番はない。 */
+  #sidebar-resize {
+    display: none;
   }
 
   /* 画面まわりの字は、指の距離で読む前提でひと回り上げる。 */
